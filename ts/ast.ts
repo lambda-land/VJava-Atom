@@ -1,6 +1,7 @@
 'use babel'
+import { DisplayMarker, RangeLike, TextEditor } from 'atom';
 
-import { Selector, Branch } from './ui';
+import { Branch, Selector } from './ui';
 
 type Pos = [number, number]; // row, column
 
@@ -12,8 +13,8 @@ export interface Span {
 export interface ContentNode {
     type: "text";
     content: string;
-    span?: Span;
-    marker?: AtomCore.IDisplayBufferMarker;
+    span?: RangeLike;
+    marker?: DisplayMarker;
 }
 
 type ChoiceKind = "positive" | "contrapositive";
@@ -26,15 +27,15 @@ export interface ChoiceNode {
     thenbranch: RegionNode;
     elsebranch: RegionNode;
     kind: ChoiceKind;
-    span?: Span;
-    marker?: AtomCore.IDisplayBufferMarker;
+    span?: RangeLike;
+    marker?: DisplayMarker;
     delete?: boolean;
 }
 
 export interface RegionNode {
     type: "region";
     segments: SegmentNode[];
-    span?: Span;
+    span?: RangeLike;
     hidden?: boolean;
 }
 
@@ -46,7 +47,7 @@ export type SegmentNode = ContentNode | ChoiceNode;
  */
 export abstract class SyntaxWalker {
     visitDocument(doc: RegionNode): void {
-      this.visitRegion(doc);
+        this.visitRegion(doc);
     }
 
     visitContent(node: ContentNode): void { }
@@ -93,12 +94,12 @@ export class SpanWalker extends SyntaxWalker {
 
 
     visitContent(node: ContentNode): void {
-      //.slice(0, -1)
+        //.slice(0, -1)
         const endPos = this.accumulate(this.currentPos, node.content.slice(0, -1)); //put the end marker before the final newline
 
         node.span = {
-            start: this.currentPos,
-            end: endPos
+            start: { row: this.currentPos[0], column: this.currentPos[1] },
+            end: { row: endPos[0], column: endPos[1] }
         };
 
         this.currentPos = endPos;
@@ -115,19 +116,19 @@ export class SpanWalker extends SyntaxWalker {
         this.visitRegion(node.thenbranch);
 
         //if we visited anything in the thenbranch, we need to accumulate a newline b/c the last of those was a text node
-        if(node.thenbranch.segments.length > 0 && !node.thenbranch.hidden) {
+        if (node.thenbranch.segments.length > 0 && !node.thenbranch.hidden) {
             this.currentPos = this.accumulate(this.currentPos, '\n');
         }
 
         this.visitRegion(node.elsebranch);
 
         node.span = {
-            start: startPos,
-            end: this.currentPos
+            start: { row: startPos[0], column: startPos[1] },
+            end: { row: this.currentPos[0], column: this.currentPos[1] }
         };
 
         //if we visited anything in the elsebranch, we need to accumulate a newline b/c the last of those was a text node
-        if(node.elsebranch.segments.length > 0 && !node.elsebranch.hidden) {
+        if (node.elsebranch.segments.length > 0 && !node.elsebranch.hidden) {
             this.currentPos = this.accumulate(this.currentPos, '\n');
         }
     }
@@ -140,8 +141,8 @@ export class SpanWalker extends SyntaxWalker {
             super.visitRegion(node);
 
             node.span = {
-                start: startPos,
-                end: this.currentPos
+                start: { row: startPos[0], column: startPos[1] },
+                end: { row: this.currentPos[0], column: this.currentPos[1] }
             };
         }
     }
@@ -245,12 +246,11 @@ export class ASTSearcher {
     constructor(public doc: RegionNode) {
     }
 
-    isLocationAtStartOfSpan(location: TextBuffer.IPoint) : boolean {
+    isLocationAtStartOfSpan(location: TextBuffer.Point): boolean {
         return this.checkStartsInRegion(this.doc, location);
     }
 
-    checkStartsInRegion(region: RegionNode, location: TextBuffer.IPoint) : boolean {
-        var found = false;
+    checkStartsInRegion(region: RegionNode, location: TextBuffer.Point): boolean {
         for (var segment of region.segments) {
             if (spanContainsPoint(segment.span, location)) {
                 if (segment.span.start[0] === location.row && segment.span.start[1] === location.column) return true;
@@ -260,7 +260,7 @@ export class ASTSearcher {
         }
     }
 
-    checkEndsInRegion(region: RegionNode, location: TextBuffer.IPoint) : boolean {
+    checkEndsInRegion(region: RegionNode, location: TextBuffer.Point): boolean {
         for (var segment of region.segments) {
             if (inclusiveSpanContainsPoint(segment.span, location)) {
                 if (segment.span.end[0] === location.row && segment.span.end[1] === location.column) return true; //this means it's at the end of a span
@@ -270,7 +270,7 @@ export class ASTSearcher {
         }
     }
 
-    isLocationAtEndOfSpan(location: TextBuffer.IPoint) : boolean {
+    isLocationAtEndOfSpan(location: TextBuffer.Point): boolean {
         return this.checkEndsInRegion(this.doc, location);
     }
 
@@ -278,7 +278,7 @@ export class ASTSearcher {
 
 export class NodeInserter extends SyntaxRewriter {
 
-    constructor(public newNode: SegmentNode, public location: TextBuffer.IPoint, public editor: AtomCore.IEditor) {
+    constructor(public newNode: SegmentNode, public location: TextBuffer.Point, public editor: TextEditor) {
         super();
     }
 
@@ -309,12 +309,12 @@ export class NodeInserter extends SyntaxRewriter {
     }
 
     rewriteContent(node: ContentNode): SegmentNode[] {
-        const firstRange: Span = {
+        const firstRange: RangeLike = {
             start: node.span.start,
-            end: [this.location.row, this.location.column]
+            end: { row: this.location.row, column: this.location.column }
         };
-        const secondRange: Span = {
-            start: [this.location.row, this.location.column],
+        const secondRange: RangeLike = {
+            start: { row: this.location.row, column: this.location.column },
             end: node.span.end
         };
 
@@ -333,13 +333,11 @@ export class NodeInserter extends SyntaxRewriter {
 
 export class AlternativeInserter extends SyntaxRewriter {
 
-    constructor(public altNode: SegmentNode, public location: TextBuffer.IPoint, public branch: Branch, public dimension: string) {
+    constructor(public altNode: SegmentNode, public location: TextBuffer.Point, public branch: Branch, public dimension: string) {
         super();
     }
 
     rewriteChoice(node: ChoiceNode) {
-        var newthenbranch : RegionNode;
-        var newelsebranch : RegionNode;
         const newNode: ChoiceNode = copyFromChoice(node);
 
         var newThenSegments = [];
@@ -372,7 +370,7 @@ export class AlternativeInserter extends SyntaxRewriter {
             }
         }
         if (!deeper) {
-            if(node.elsebranch.segments.length != 0) throw "This alternative already exists";
+            if (node.elsebranch.segments.length != 0) throw "This alternative already exists";
             else newElseSegments = [this.altNode];
         }
 
@@ -413,14 +411,14 @@ export class AlternativeInserter extends SyntaxRewriter {
 export class EditPreserver extends SyntaxWalker {
     index: number;
 
-      constructor(public editor: AtomCore.IEditor, public selections: Selector[],
-        public regionMarkers: AtomCore.IDisplayBufferMarker[]) {
+    constructor(public editor: TextEditor, public selections: Selector[],
+        public regionMarkers: DisplayMarker[]) {
         super();
     }
 
     visitDocument(doc: RegionNode): boolean {
-      this.index = -1;
-      return this.visitRegion(doc);
+        this.index = -1;
+        return this.visitRegion(doc);
     }
 
     visitContent(node: ContentNode): boolean {
@@ -444,18 +442,18 @@ export class EditPreserver extends SyntaxWalker {
         }
 
         //then look for nodes which have been marked for deletion (null)
-        for(var i = 0; i < region.segments.length; i ++) {
-          if(region.segments[i].type == 'choice' && (region.segments[i] as ChoiceNode).delete) {
-            region.segments.splice(i, 1);
-          }
+        for (var i = 0; i < region.segments.length; i++) {
+            if (region.segments[i].type == 'choice' && (region.segments[i] as ChoiceNode).delete) {
+                region.segments.splice(i, 1);
+            }
         }
 
         //then combine any adjacent text nodes
-        for( var i=0; i < region.segments.length; i ++) {
+        for (var i = 0; i < region.segments.length; i++) {
             //if two text segments are abutting each other, simply combine them
-            if(region.segments[i].type === "text" && (i+1 < region.segments.length) && region.segments[i+1].type === "text") {
-                (region.segments[i] as ContentNode).content = (region.segments[i] as ContentNode).content + (region.segments[i+1] as ContentNode).content;
-                region.segments.splice(i+1, 1);
+            if (region.segments[i].type === "text" && (i + 1 < region.segments.length) && region.segments[i + 1].type === "text") {
+                (region.segments[i] as ContentNode).content = (region.segments[i] as ContentNode).content + (region.segments[i + 1] as ContentNode).content;
+                region.segments.splice(i + 1, 1);
             }
         }
         return changes;
@@ -470,8 +468,8 @@ export class EditPreserver extends SyntaxWalker {
             this.index += 1;
             var subsumed = false;
             //if the marker hasn't been invalidated, then we're good to go.
-            if(this.regionMarkers[this.index] && this.regionMarkers[this.index].isValid()) {
-              recurseThen = true;
+            if (this.regionMarkers[this.index] && this.regionMarkers[this.index].isValid()) {
+                recurseThen = true;
             } else {
                 changes = true;
                 //on the other hand, if the marker was invalidated, we need to seriously modify this node
@@ -479,19 +477,19 @@ export class EditPreserver extends SyntaxWalker {
                 //if the this-branch of a positive node was destroyed but the else-branch wasn't
                 //make the node a contrapositive node, and
                 //use the old else-branch as the new then-branch
-                if((node.elsebranch.segments.length > 0) && (this.regionMarkers[this.index+1] && this.regionMarkers[this.index+1].isValid()) || node.elsebranch.hidden) {
-                    if(node.kind === 'positive') {
-                      node.kind = 'contrapositive';
-                      node.thenbranch = {segments: node.elsebranch.segments, type: 'region'}
-                      node.elsebranch.segments = [];
-                    } else if(node.kind === 'contrapositive') {
-                      //and vice versa
-                      node.kind = 'positive';
-                      node.thenbranch = {segments: node.elsebranch.segments, type: 'region'}
-                      node.elsebranch.segments = [];
+                if ((node.elsebranch.segments.length > 0) && (this.regionMarkers[this.index + 1] && this.regionMarkers[this.index + 1].isValid()) || node.elsebranch.hidden) {
+                    if (node.kind === 'positive') {
+                        node.kind = 'contrapositive';
+                        node.thenbranch = { segments: node.elsebranch.segments, type: 'region' }
+                        node.elsebranch.segments = [];
+                    } else if (node.kind === 'contrapositive') {
+                        //and vice versa
+                        node.kind = 'positive';
+                        node.thenbranch = { segments: node.elsebranch.segments, type: 'region' }
+                        node.elsebranch.segments = [];
                     }
                     //increment if the other branch that was just subsumed *wasn't* hidden
-                    if(node.elsebranch.hidden == false) this.index += 1;
+                    if (node.elsebranch.hidden == false) this.index += 1;
 
                     //then recurse on the now-then-branch
                     recurseThen = true;
@@ -503,34 +501,34 @@ export class EditPreserver extends SyntaxWalker {
                 }
 
                 subsumed = true; // subsumed is true because in any case, we no longer need to look at the else-branch
-                if(node.elsebranch.segments.length > 0) this.index += 1;
+                if (node.elsebranch.segments.length > 0) this.index += 1;
 
             }
         }
         if (isBranchActive(node, selection, "elsebranch") && !subsumed && (node.elsebranch.segments.length > 0) && !node.elsebranch.hidden) {
             this.index += 1;
             //if the marker hasn't been invalidated, then we're good to go.
-            if(this.regionMarkers[this.index] && this.regionMarkers[this.index].isValid()) {
-              recurseElse = true;
+            if (this.regionMarkers[this.index] && this.regionMarkers[this.index].isValid()) {
+                recurseElse = true;
             } else {
                 changes = true;
-              //on the other hand, if the marker was invalidated, we need to seriously modify this node
+                //on the other hand, if the marker was invalidated, we need to seriously modify this node
 
-              //if the else-branch of a positive node was destroyed but the then-branch wasn't
-              //simply make this a single-alternative node
-              if((this.regionMarkers[this.index-1] && this.regionMarkers[this.index-1].isValid()) || node.thenbranch.hidden) {
-                node.elsebranch.segments = [];
-              } else {
-                //in the case where both alternatives were shown, and neither marker is valid
-                //the user has attempted to delete this entire choice node, so we mark it for deletion
-                node.delete = true;
-              }
+                //if the else-branch of a positive node was destroyed but the then-branch wasn't
+                //simply make this a single-alternative node
+                if ((this.regionMarkers[this.index - 1] && this.regionMarkers[this.index - 1].isValid()) || node.thenbranch.hidden) {
+                    node.elsebranch.segments = [];
+                } else {
+                    //in the case where both alternatives were shown, and neither marker is valid
+                    //the user has attempted to delete this entire choice node, so we mark it for deletion
+                    node.delete = true;
+                }
 
 
             }
         }
-        if(recurseThen) changes = this.visitRegion(node.thenbranch) || changes;
-        if(recurseElse) changes = this.visitRegion(node.elsebranch) || changes;
+        if (recurseThen) changes = this.visitRegion(node.thenbranch) || changes;
+        if (recurseElse) changes = this.visitRegion(node.elsebranch) || changes;
         return changes;
     }
 }
@@ -550,9 +548,9 @@ export function isBranchActive(node, selection: Selector, branch: Branch) {
     if (selection) {
         return selection.status === 'BOTH' ||
             (selection.status === 'DEF' && branch === "thenbranch" && node.kind === "positive"
-            || selection.status === 'DEF' && branch === "elsebranch" && node.kind === "contrapositive"
-            || selection.status === 'NDEF' && branch === "elsebranch" && node.kind === "positive"
-            || selection.status === 'NDEF' && branch === "thenbranch" && node.kind === "contrapositive")
+                || selection.status === 'DEF' && branch === "elsebranch" && node.kind === "contrapositive"
+                || selection.status === 'NDEF' && branch === "elsebranch" && node.kind === "positive"
+                || selection.status === 'NDEF' && branch === "thenbranch" && node.kind === "contrapositive")
     } else return false;
 }
 
@@ -585,41 +583,7 @@ export class DimensionDeleter extends SyntaxRewriter {
     }
 }
 
-class SimplifierRewriter extends SyntaxRewriter {
-
-    rewriteRegion(region: RegionNode): RegionNode {
-        const newSegments: SegmentNode[] = [];
-        for (const segment of region.segments) {
-            if (segment.type === "text") {
-                this.simplifyContent(newSegments, segment);
-            } else {
-                newSegments.push(...this.rewriteChoice(segment));
-            }
-        }
-
-        const newRegion: RegionNode = {
-            type: "region",
-            segments: newSegments
-        };
-
-        return newRegion;
-    }
-
-    simplifyContent(newSegments: SegmentNode[], contentNode: ContentNode) {
-        const last = newSegments[newSegments.length - 1];
-        if (last && last.type === "text") {
-            last.content += contentNode.content;
-        } else {
-            const newSegment: ContentNode = {
-                type: "text",
-                content: contentNode.content
-            };
-            newSegments.push(newSegment);
-        }
-    }
-}
-
-function spanContainsPoint(outer: Span, inner: TextBuffer.IPoint): boolean {
+function spanContainsPoint(outer: RangeLike, inner: TextBuffer.Point): boolean {
     return (
         ((outer.start[0] === inner.row && outer.start[1] <= inner.column) // inclusive at the beginning, exclusive at the end
             ||
@@ -631,7 +595,7 @@ function spanContainsPoint(outer: Span, inner: TextBuffer.IPoint): boolean {
     )
 }
 
-function inclusiveSpanContainsPoint(outer: Span, inner: TextBuffer.IPoint) : boolean {
+function inclusiveSpanContainsPoint(outer: RangeLike, inner: TextBuffer.Point): boolean {
     return (
         ((outer.start[0] === inner.row && outer.start[1] < inner.column) // exclusive at the beginning, inclusive at the end
             ||
@@ -661,13 +625,13 @@ function renderContents(acc: string, node: SegmentNode): string {
 export function docToPlainText(region: RegionNode): string {
     var last;
     var finalText = '';
-    for(var i = 0; i < region.segments.length; i ++) {
-      var seg = region.segments[i];
-      var text = nodeToPlainText('', seg);
-      //if this segment is right after a choice segment, make sure it begins with a newline
-      if(last && last.type === 'choice' && text[0] != '\n') text = '\n' + text;
-      last = seg;
-      finalText = finalText + text;
+    for (var i = 0; i < region.segments.length; i++) {
+        var seg = region.segments[i];
+        var text = nodeToPlainText('', seg);
+        //if this segment is right after a choice segment, make sure it begins with a newline
+        if (last && last.type === 'choice' && text[0] != '\n') text = '\n' + text;
+        last = seg;
+        finalText = finalText + text;
     }
     return finalText;
 }
@@ -681,13 +645,13 @@ export function nodeToPlainText(acc: string, node: SegmentNode): string {
 
 
         var rest = docToPlainText(node.thenbranch);
-        if(rest[0] != '\n') rest = '\n' + rest;
+        if (rest[0] != '\n') rest = '\n' + rest;
 
         acc = acc + syntax + rest
 
         if (node.elsebranch.segments.length > 0) {
             var rest = docToPlainText(node.elsebranch);
-            if(rest[0] != '\n') rest = '\n' + rest;
+            if (rest[0] != '\n') rest = '\n' + rest;
             acc = acc + '#else' + rest
         }
         acc = acc + '#endif';

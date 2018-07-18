@@ -1,27 +1,31 @@
-  'use babel';
+'use babel';
 
-declare module 'atom' {
-    class CompositeDisposable {
-        add(command: any): void;
-        dispose(): void;
-    }
-}
-
-import fs from 'fs';
-import path from 'path';
-import $ from 'jquery';
 import 'spectrum-colorpicker';
-import { CompositeDisposable } from 'atom';
-
+import { CompositeDisposable, Disposable, TextEditor } from 'atom';
 import { spawn } from 'child_process';
+import fs from 'fs';
+import $ from 'jquery';
+import path from 'path';
 
 import {
-    Span, RegionNode, SegmentNode, ChoiceNode, ContentNode, renderDocument,
-    docToPlainText, ViewRewriter, SpanWalker, NodeInserter, DimensionDeleter,
-    EditPreserver, getSelectionForDim, getSelectionForNode, isBranchActive,
-    AlternativeInserter, ASTSearcher
+    AlternativeInserter,
+    ASTSearcher,
+    ChoiceNode,
+    ContentNode,
+    DimensionDeleter,
+    EditPreserver,
+    NodeInserter,
+    RegionNode,
+    SegmentNode,
+    Span,
+    ViewRewriter,
+    docToPlainText,
+    getSelectionForDim,
+    getSelectionForNode,
+    isBranchActive,
+    renderDocument,
 } from './ast';
-import { VJavaUI, DimensionUI, Branch, Selector, NestLevel, DimensionStatus } from './ui'
+import { DimensionStatus, DimensionUI, NestLevel, Selector, VJavaUI } from './ui'
 
 // ----------------------------------------------------------------------------
 
@@ -36,7 +40,7 @@ declare global {
         }
 
         interface IDisplayBufferMarker {
-            onDidDestroy(cb: Function) : void
+            onDidDestroy(cb: Function): void
         }
 
         interface IKeymapManager {
@@ -54,7 +58,7 @@ declare global {
     }
 
     interface JQuery {
-        spectrum({color});
+        spectrum({ color });
         spectrum(method: string);
     }
 
@@ -81,46 +85,23 @@ function getndefbranchCssClass(dimName) {
     return 'dimension-marker-' + dimName + "-ndefbranch";
 }
 
-function rangeToSpan(range): Span {
-    const span: Span = {
-        start: [range.start.row, range.start.column],
-        end: [range.end.row, range.end.column]
-    };
-    return span;
-}
-
-function incrementRow(range: [number, number]): [number, number] {
-  return [range[0]+1, range[1]];
-}
-function incrementCol(range: [number, number]): [number, number] {
-  return [range[0], range[1] +1];
-}
-
-function decrementRow(range: [number, number]): [number, number] {
-  return [range[0]-1, range[1]];
-}
-
-
 // ----------------------------------------------------------------------------
-
-// organize this stuff please.
-var linesRemoved = 0;
-var linesReAdded = 0;
 
 function shadeColor(rgb: string, lum?: number) {
 
     lum = lum || 0;
     lum = lum + 1;
 
-    // convert to decimal and change luminosity
-    var parens = rgb.split('(');
-    var nums = parens[1].replace(' ', '').split(',');
+    // The regex matches on 'rgb(x, y , z)' and returns a pair
+    // ['rgb(x, y, z)', 'x, y, z']
+    const rgbMatch: string[] = rgb.match(/rgb\(([^)]*)\)/);
+    const rgbValues: string[] = rgbMatch[1].split(',');
 
-    return `rgba(${Math.floor(parseInt(nums[0], 10) * lum)}, ${Math.floor(parseInt(nums[1], 10) * lum)}, ${Math.floor(parseInt(nums[2], 10) * lum)}, .3)`;
+    // convert to decimal and change luminosity
+    return `rgba(${Math.floor(parseInt(rgbValues[0], 10) * lum)}, ${Math.floor(parseInt(rgbValues[1], 10) * lum)}, ${Math.floor(parseInt(rgbValues[2], 10) * lum)}, .3)`;
 }
 
 // the heck is this state doing here?
-var rendering = false;
 const mainDivId = 'variationalJavaUI';
 const enclosingDivId = 'enclosingDivJavaUI';
 const secondaryDivId = 'variationalJavaUIButtons';
@@ -129,20 +110,20 @@ var iconsPath = atom.packages.resolvePackagePath("variational-java") + "/icons";
 
 class VJava {
 
-    styles: {[selector : string] : string} = {}
+    styles: { [selector: string]: string } = {}
     nesting: NestLevel[] // a stack represented nested dimensions
     ui: VJavaUI
     doc: RegionNode
     raw: string
     addChoiceLockout: boolean = false
-    lastCursorLocation: TextBuffer.IPoint
+    lastCursorLocation: TextBuffer.Point
     lastShowDoc: RegionNode
-    popupListenerQueue: { element : HTMLElement, text: string }[]
+    popupListenerQueue: { element: HTMLElement, text: string }[]
     colorpicker: {}
     dimensionColors: {}
     activeChoices: Selector[] // in the form of dimensionId:thenbranch|elsebranch
     subscriptions: CompositeDisposable
-    saveSubscription: AtomCore.Disposable
+    saveSubscription: Disposable
     tooltips: CompositeDisposable
     state: "parsed" | "unparsed"
 
@@ -186,7 +167,14 @@ class VJava {
 
             $('#new-dimension-name').focus();
             $('#new-dimension-name').on('focusout', () => {
-                dimName = $('#new-dimension-name').val();
+                var tmpName = $('#new-dimension-name').val();
+                if (typeof tmpName === 'string') {
+                    dimName = tmpName;
+                }
+                else {
+                    throw new TypeError(`dimName requires string, got${typeof tmpName}`);
+                }
+
                 for (var i = 0; i < this.ui.dimensions.length; i++) {
                     if (this.ui.dimensions[i].name === dimName) {
                         alert('Please select a unique name for this dimension');
@@ -247,7 +235,7 @@ class VJava {
                 whenSelectedSub[`variational-java:add-choice-segment-${dimName}-selected`] = () => this.addChoiceSegment(dimName, "DEF");
                 var whenUnselectedSub = {};
                 whenUnselectedSub[`variational-java:add-choice-segment-${dimName}-unselected`] = () => this.addChoiceSegment(dimName, "NDEF");
-                this.ui.contextMenu = atom.contextMenu.add({'atom-text-editor': [{label: 'Insert Choice', submenu: this.ui.menuItems}]});
+                this.ui.contextMenu = atom.contextMenu.add({ 'atom-text-editor': [{ label: 'Insert Choice', submenu: this.ui.menuItems }] });
 
                 this.subscriptions.add(atom.commands.add('atom-text-editor', whenSelectedSub));
                 this.subscriptions.add(atom.commands.add('atom-text-editor', whenUnselectedSub));
@@ -263,7 +251,7 @@ class VJava {
                 this.ui.dimensions.push(dimension);
 
                 // default new dimensions to show both branches
-                this.ui.activeChoices.push({name: dimension.name, status: 'BOTH'});
+                this.ui.activeChoices.push({ name: dimension.name, status: 'BOTH' });
             });
         });
     }
@@ -316,9 +304,9 @@ class VJava {
         this.styles = {}
     }
 
-    serializeColors() : string {
+    serializeColors(): string {
         var css = '';
-        for(var selector in this.styles) {
+        for (var selector in this.styles) {
             css += selector + ` { ${this.styles[selector]}} \n`;
         }
         return css;
@@ -333,7 +321,7 @@ class VJava {
         $('head').append(`<style id='dimension-color-styles'>${css}</style>`);
     }
 
-    setColors(node: SegmentNode) : void {
+    setColors(node: SegmentNode): void {
         //if this is a dimension
         if (node.type === 'choice') {
             var color = this.ui.getColorForNode(node);
@@ -348,7 +336,7 @@ class VJava {
             var selectors = [];
             var nestColors = [];
 
-            if (this.nesting.length > 0)  {
+            if (this.nesting.length > 0) {
                 for (var j = 0; j < this.nesting.length; j++) {
                     //nesting class format: 'nested-[DIM ID]-[BRANCH]-[LEVEL]'
                     selectors.push('.nested-' + this.nesting[j].selector.name + '-' + this.nesting[j].selector.status + '-' + j);
@@ -356,7 +344,6 @@ class VJava {
 
                     //pre-shading nest color
                     var nestcolor = this.ui.getColorForNode(this.nesting[j].dimension);
-                    var kind = this.nesting[j].dimension.kind;
 
                     //nest in the correct branch color
                     if (status === 'DEF') nestcolor = shadeColor(nestcolor, .1);
@@ -425,22 +412,22 @@ class VJava {
 
     //using the list of dimensions contained within the ui object,
     //add html elements, markers, and styles to distinguish dimensions for the user
-    renderDimensionUI(editor: AtomCore.IEditor, node: SegmentNode) {
+    renderDimensionUI(editor: TextEditor, node: SegmentNode) {
 
         //if this is a dimension
         if (node.type === "choice") {
 
             //and this dimension has not yet been parsed
             if (!this.ui.hasDimension(node.name)) {
-              var previousSelection = false;
-              for (var i = 0; i < this.ui.activeChoices.length; i++) {
-                  if (this.ui.activeChoices[i].name === node.name) {
-                    previousSelection = true;
-                    break;
-                  }
-              }
-              // default the selection to 'BOTH' if none has been made
-              if(!previousSelection) this.ui.activeChoices.push({name: node.name, status: 'BOTH'});
+                var previousSelection = false;
+                for (var i = 0; i < this.ui.activeChoices.length; i++) {
+                    if (this.ui.activeChoices[i].name === node.name) {
+                        previousSelection = true;
+                        break;
+                    }
+                }
+                // default the selection to 'BOTH' if none has been made
+                if (!previousSelection) this.ui.activeChoices.push({ name: node.name, status: 'BOTH' });
 
                 var dimDiv = $(`<div class='form-group dimension-ui-div' id='${node.name}'>
               <input class='colorpicker' type='text' id="${node.name}-colorpicker">
@@ -491,10 +478,7 @@ class VJava {
 
                 this.ui.menuItems.push(menuItem);
 
-                //first try to use the color on the dimension
-                var uiColor: string = this.ui.getColorForNode(node);
-
-                var dimUIElement = this.ui.setupColorPickerForDim(node.name, editor);
+                var dimUIElement = this.ui.setupColorPickerForDim(node.name);
 
                 dimUIElement.colorpicker.on('change', () => {
                     var rgba = dimUIElement.colorpicker.spectrum('get').toRgbString();
@@ -509,7 +493,7 @@ class VJava {
 
             if (isBranchActive(node, getSelectionForNode(node, this.ui.activeChoices), "thenbranch") && node.thenbranch.segments.length > 0 && !node.thenbranch.hidden) {
                 //add markers for this new range of a (new or pre-existing) dimension
-                var thenbranchMarker = editor.markBufferRange(node.thenbranch.span, {invalidate: 'surround'});
+                var thenbranchMarker = editor.markBufferRange(node.thenbranch.span, { invalidate: 'surround' });
                 this.ui.regionMarkers.push(thenbranchMarker);
 
                 //decorate with the appropriate css classes
@@ -540,7 +524,7 @@ class VJava {
                     var vjava = this;
                     element.onclick = () => {
                         vjava.preserveChanges(editor);
-                        var newNode : ContentNode = {
+                        var newNode: ContentNode = {
                             type: "text",
                             content: "\n\n"
                         };
@@ -553,7 +537,7 @@ class VJava {
                     element.classList.add(`hover-alt-${node.name}`);
                     element.classList.add(`hover-alt`);
                     element.classList.add(node.kind === 'positive' ? getndefbranchCssClass(node.name) : getdefbranchCssClass(node.name));
-                    this.popupListenerQueue.push({element: element, text: renderDocument(node.elsebranch) });
+                    this.popupListenerQueue.push({ element: element, text: renderDocument(node.elsebranch) });
 
                     var elseHiddenMarker = editor.markBufferPosition(node.thenbranch.span.end);
                     this.ui.markers.push(elseHiddenMarker);
@@ -571,7 +555,7 @@ class VJava {
 
             if (isBranchActive(node, getSelectionForNode(node, this.ui.activeChoices), "elsebranch") && node.elsebranch.segments.length > 0 && !node.elsebranch.hidden) {
 
-                var elsebranchMarker = editor.markBufferRange(node.elsebranch.span, {invalidate: 'surround'});
+                var elsebranchMarker = editor.markBufferRange(node.elsebranch.span, { invalidate: 'surround' });
                 elsebranchMarker.onDidDestroy(() => {
                     this.preserveChanges(editor);
                     this.updateEditorText();
@@ -579,7 +563,7 @@ class VJava {
                 this.ui.regionMarkers.push(elsebranchMarker);
 
                 var element = document.createElement('div');
-                editor.decorateMarker(elsebranchMarker, { type: 'line', class: node.kind === 'positive' ? getndefbranchCssClass(node.name) : getdefbranchCssClass(node.name)  });
+                editor.decorateMarker(elsebranchMarker, { type: 'line', class: node.kind === 'positive' ? getndefbranchCssClass(node.name) : getdefbranchCssClass(node.name) });
 
                 for (var i = this.nesting.length - 1; i >= 0; i--) {
                     //nesting class format: 'nested-[DIM ID]-[BRANCH]-[LEVEL]'
@@ -601,7 +585,7 @@ class VJava {
                     var vjava = this;
                     element.onclick = () => {
                         vjava.preserveChanges(editor);
-                        var newNode : ContentNode = {
+                        var newNode: ContentNode = {
                             type: "text",
                             content: "\n"
                         };
@@ -615,7 +599,7 @@ class VJava {
                     element.classList.add(`hover-alt`);
                     element.classList.add(node.kind === 'positive' ? getdefbranchCssClass(node.name) : getndefbranchCssClass(node.name));
 
-                    this.popupListenerQueue.push({element: element, text: renderDocument(node.thenbranch) });
+                    this.popupListenerQueue.push({ element: element, text: renderDocument(node.thenbranch) });
 
                     var thenHiddenMarker = editor.markBufferPosition(node.elsebranch.span.start);
                     this.ui.markers.push(thenHiddenMarker);
@@ -633,7 +617,7 @@ class VJava {
 
 
         } else {
-            var m = editor.markBufferRange(node.span, {invalidate: 'surround'});
+            var m = editor.markBufferRange(node.span, { invalidate: 'surround' });
             this.ui.markers.push(m);
             node.marker = m;
         }
@@ -667,16 +651,16 @@ class VJava {
         var deleter = new DimensionDeleter(selection);
         this.doc = deleter.rewriteRegion(this.doc);
         this.updateEditorText();
-        for(var i = 0; i < this.ui.menuItems.length; i ++) {
-            if(this.ui.menuItems[i].label === selection.name) {
+        for (var i = 0; i < this.ui.menuItems.length; i++) {
+            if (this.ui.menuItems[i].label === selection.name) {
                 this.ui.menuItems.splice(i, 1);
             }
         }
         this.ui.contextMenu.dispose();
-        this.ui.contextMenu = atom.contextMenu.add({'atom-text-editor': [{label: 'Insert Choice', submenu: this.ui.menuItems}]});
+        this.ui.contextMenu = atom.contextMenu.add({ 'atom-text-editor': [{ label: 'Insert Choice', submenu: this.ui.menuItems }] });
     }
 
-    deleteBranch(region: RegionNode, editor: AtomCore.IEditor) {
+    deleteBranch(region: RegionNode, editor: TextEditor) {
         for (let segment of region.segments) {
             if (segment.type === 'choice') {
                 this.deleteBranch(segment.thenbranch, editor);
@@ -687,13 +671,14 @@ class VJava {
         }
     }
 
-    preserveChanges(editor: AtomCore.IEditor) : boolean {
+    preserveChanges(editor: TextEditor): boolean {
         var preserver: EditPreserver = new EditPreserver(editor, this.ui.activeChoices, this.ui.regionMarkers);
         return preserver.visitDocument(this.doc);
     }
 
     parseVJava(textContents: string, next: () => void) {
-        const packagePath = atom.packages.resolvePackagePath("variational-java");
+        const packagePath = atom.packages.resolvePackagePath("variational-editor-atom");
+
         const parserPath = path.resolve(packagePath, "lib", "variational-parser");
 
         const parserProcess = spawn(parserPath, [], { cwd: packagePath });
@@ -747,7 +732,7 @@ class VJava {
         this.lastShowDoc = showDoc;
         editor.setText(renderDocument(showDoc));
 
-        for(var marker of this.ui.markers) {
+        for (var marker of this.ui.markers) {
             marker.destroy();
         }
         this.ui.markers = [];
@@ -759,8 +744,8 @@ class VJava {
             this.renderDimensionUI(editor, showDoc.segments[i]);
         }
 
-        for(var popup of this.popupListenerQueue) {
-            this.tooltips.add(atom.tooltips.add(popup.element, {title: popup.text}));
+        for (var popup of this.popupListenerQueue) {
+            this.tooltips.add(atom.tooltips.add(popup.element, { title: popup.text }));
         }
         this.popupListenerQueue = [];
 
@@ -805,7 +790,7 @@ class VJava {
 
             this.updateEditorText();
 
-            this.ui.contextMenu = atom.contextMenu.add({'atom-text-editor': [{label: 'Insert Choice', submenu: this.ui.menuItems}]});
+            this.ui.contextMenu = atom.contextMenu.add({ 'atom-text-editor': [{ label: 'Insert Choice', submenu: this.ui.menuItems }] });
 
             // Register command that toggles vjava view
             this.subscriptions.add(atom.commands.add('atom-workspace', {
@@ -816,7 +801,7 @@ class VJava {
             }));
 
             atom.views.getView(activeEditor).addEventListener("keyup", (event) => { this.KeyUpCheck(event); });
-            atom.views.getView(activeEditor).addEventListener("keydown", (event) => { this.KeyDownCheck(event);});
+            atom.views.getView(activeEditor).addEventListener("keydown", (event) => { this.KeyDownCheck(event); });
 
             this.saveSubscription = activeEditor.onDidSave(this.handleDidSave.bind(this));
 
@@ -825,14 +810,16 @@ class VJava {
 
             this.ui.panel.show();
             var pathBits = activeEditor.getPath().split('.');
-            activeEditor.saveAs(pathBits.splice(0,pathBits.length-1).join('.') + '-temp-vjava.' + pathBits[pathBits.length-1]);
+            activeEditor.saveAs(pathBits.splice(0, pathBits.length - 1).join('.') + '-temp-vjava.' + pathBits[pathBits.length - 1]);
         });
     }
 
+    // Currently `event` isn't used, but it's required because the event
+    // listener passes an event to this function. For now ignore any typescript
+    // warnings about its value never being read.
     KeyDownCheck(event) {
-        if(this.state === "parsed") {
+        if (this.state === "parsed") {
             //make note of the last cursor position so we can use it on keyup
-            var searcher = new ASTSearcher(this.doc);
             var activeEditor = atom.workspace.getActiveTextEditor();
             var location = activeEditor.getCursorBufferPosition();
             this.lastCursorLocation = location;
@@ -841,58 +828,57 @@ class VJava {
 
     KeyUpCheck(event) {
         var KeyID = event.keyCode;
-        if(this.state === "parsed") {
-           switch(KeyID)
-           {
-              case 8:
-                //nobackspaceforyou
-                var searcher = new ASTSearcher(this.lastShowDoc);
-                var activeEditor = atom.workspace.getActiveTextEditor();
-                if(searcher.isLocationAtStartOfSpan(this.lastCursorLocation)) {
-                    this.updateEditorText();
-                    activeEditor.setCursorBufferPosition(this.lastCursorLocation);
-                }
-                break;
-              case 46:
-                //nodeleteforyou
-                var searcher = new ASTSearcher(this.lastShowDoc);
-                var activeEditor = atom.workspace.getActiveTextEditor();
-                if(searcher.isLocationAtEndOfSpan(this.lastCursorLocation)) {
-                    this.updateEditorText();
-                    activeEditor.setCursorBufferPosition(this.lastCursorLocation);
-                }
-                break;
-              default: //if someone pressed another key besides backspace or delete, just preserve their change
-                break;
-            }
-                setTimeout(() => {
+        if (this.state === "parsed") {
+            switch (KeyID) {
+                case 8:
+                    //nobackspaceforyou
+                    var searcher = new ASTSearcher(this.lastShowDoc);
                     var activeEditor = atom.workspace.getActiveTextEditor();
-                    var location = activeEditor.getCursorBufferPosition();
-                    this.lastCursorLocation = location;
-
-                    if(this.preserveChanges(activeEditor)) {
+                    if (searcher.isLocationAtStartOfSpan(this.lastCursorLocation)) {
                         this.updateEditorText();
                         activeEditor.setCursorBufferPosition(this.lastCursorLocation);
                     }
+                    break;
+                case 46:
+                    //nodeleteforyou
+                    var searcher = new ASTSearcher(this.lastShowDoc);
+                    var activeEditor = atom.workspace.getActiveTextEditor();
+                    if (searcher.isLocationAtEndOfSpan(this.lastCursorLocation)) {
+                        this.updateEditorText();
+                        activeEditor.setCursorBufferPosition(this.lastCursorLocation);
+                    }
+                    break;
+                default: //if someone pressed another key besides backspace or delete, just preserve their change
+                    break;
+            }
+            setTimeout(() => {
+                var activeEditor = atom.workspace.getActiveTextEditor();
+                var location = activeEditor.getCursorBufferPosition();
+                this.lastCursorLocation = location;
+
+                if (this.preserveChanges(activeEditor)) {
+                    this.updateEditorText();
+                    activeEditor.setCursorBufferPosition(this.lastCursorLocation);
+                }
             }, 20);
 
 
-           }
+        }
     }
 
-    getOriginalPath(path : string) : string {
+    getOriginalPath(path: string): string {
         var pathBits = path.split('-temp-vjava'); //TODO is there a way to make this not a magic reserved file name?
         var originalPath = pathBits.splice(0, pathBits.length).join('');
         return originalPath;
     }
 
-    handleDidSave(event: {path: string}) {
+    handleDidSave(event: { path: string }) {
         var activeEditor = atom.workspace.getActiveTextEditor();
         var originalPath = this.getOriginalPath(event.path);
 
         this.preserveChanges(activeEditor);
         fs.writeFile(originalPath, docToPlainText(this.doc), function(err) {
-            if(err) {
+            if (err) {
                 return console.log(err);
             }
             console.log("The file was saved!");
@@ -901,7 +887,7 @@ class VJava {
     }
 
     noUndoForYou() {
-        if(this.state === "parsed") return;
+        if (this.state === "parsed") return;
         atom.commands.dispatch(atom.views.getView(atom.workspace.getActiveTextEditor()), "core:undo");
     }
 
@@ -910,18 +896,18 @@ class VJava {
 
     serialize() {
         var dims = [];
-        for(var dimension of this.ui.dimensions) {
-            dims.push({color: dimension.color, name: dimension.name, colorpicker: null})
+        for (var dimension of this.ui.dimensions) {
+            dims.push({ color: dimension.color, name: dimension.name, colorpicker: null })
         }
         var ses = [];
-        for(var dimension of this.ui.session) {
-            ses.push({color: dimension.color, name: dimension.name, colorpicker: null})
+        for (var dimension of this.ui.session) {
+            ses.push({ color: dimension.color, name: dimension.name, colorpicker: null })
         }
-        return {session: ses, dimensions: dims, activeChoices: this.ui.activeChoices};
+        return { session: ses, dimensions: dims, activeChoices: this.ui.activeChoices };
     }
 
     addChoiceSegment(dim: string, status: DimensionStatus) {
-        if(this.addChoiceLockout) return;
+        if (this.addChoiceLockout) return;
         this.addChoiceLockout = true;
         var activeEditor = atom.workspace.getActiveTextEditor();
 
@@ -935,7 +921,7 @@ class VJava {
             span: null, // we don't know what it's span will be
             name: dim,
             kind: status === 'DEF' ? 'positive' : 'contrapositive', // NOTE that in this case, status must either be 'DEF' or 'NDEF',
-                                                                    // and in fact cannot be 'BOTH' (enforced only by convention at usage sites)
+            // and in fact cannot be 'BOTH' (enforced only by convention at usage sites)
             type: 'choice',
             thenbranch: { segments: [], type: "region" },
             elsebranch: { segments: [], type: "region" }
@@ -966,7 +952,7 @@ class VJava {
             this.ui.dimensions = [];
             this.ui.menuItems = [];
 
-            for(var marker of this.ui.markers) {
+            for (var marker of this.ui.markers) {
                 marker.destroy();
             }
             this.ui.markers = [];
@@ -976,13 +962,11 @@ class VJava {
             activeEditor.setText(docToPlainText(this.doc));
             activeEditor.saveAs(this.getOriginalPath(activeEditor.getPath()));
             fs.unlink(tempPath, function(err) {
-                if(err) console.log(err);
+                if (err) console.log(err);
             });
             this.ui.contextMenu.dispose();
         } else {
             this.state = "parsed"
-            rendering = true; //TODO make use of this lockout once again
-
             var contents = activeEditor.getText();
 
             //parse the file
@@ -995,7 +979,7 @@ class VJava {
 
                 this.updateEditorText();
                 //set up context menu here
-                this.ui.contextMenu = atom.contextMenu.add({'atom-text-editor': [{label: 'Insert Choice', submenu: this.ui.menuItems}]});
+                this.ui.contextMenu = atom.contextMenu.add({ 'atom-text-editor': [{ label: 'Insert Choice', submenu: this.ui.menuItems }] });
 
                 //preserve the contents for later comparison (put, get)
                 this.raw = contents;
@@ -1003,16 +987,11 @@ class VJava {
                 this.ui.panel.show();
 
                 var pathBits = activeEditor.getPath().split('.');
-                activeEditor.saveAs(pathBits.splice(0,pathBits.length-1).join('.') + '-temp-vjava.' + pathBits[pathBits.length-1]);
+                activeEditor.saveAs(pathBits.splice(0, pathBits.length - 1).join('.') + '-temp-vjava.' + pathBits[pathBits.length - 1]);
 
                 this.saveSubscription = activeEditor.onDidSave(this.handleDidSave.bind(this));
             });
-
-            rendering = false
         }
-
-
-        return (true);
     }
 
 };

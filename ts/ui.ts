@@ -1,6 +1,8 @@
 'use babel';
-import { ChoiceNode } from './ast'
+import { DisplayMarker, Panel } from 'atom'
 import $ from 'jquery'
+
+import { ChoiceNode } from './ast'
 
 export class NestLevel {
     selector: Selector
@@ -15,7 +17,7 @@ export class Selector {
 }
 
 export interface Disposable {
-    dispose() : any
+    dispose(): any
 }
 
 export interface MenuItem {
@@ -27,30 +29,34 @@ export interface MenuItem {
 export type Branch = "thenbranch" | "elsebranch";
 
 export class VJavaUI {
-    panel: AtomCore.Panel;
+    panel: Panel;
     session: DimensionUI[];
     dimensions: DimensionUI[];
     main: JQuery;
     secondary: JQuery;
     message: JQuery;
     activeChoices: Selector[];
-    markers: AtomCore.IDisplayBufferMarker[];
-    regionMarkers: AtomCore.IDisplayBufferMarker[];
+    markers: DisplayMarker[];
+    regionMarkers: DisplayMarker[];
     contextMenu: Disposable;
     menuItems: MenuItem[]
 
 
-    constructor({panel = null, session = [], dimensions = [], activeChoices = [], markers = []}) {
-                  this.panel = panel;
-                  this.session = session;
-                  this.dimensions = dimensions; //TODO do we really need a session and a list of dimensions? are they the same?
-                  this.activeChoices = activeChoices;
-                  this.markers = markers;
+    constructor({ panel = null, session = [], dimensions = [], activeChoices = [], markers = [] }) {
+        this.panel = panel;
+        this.session = session;
+        this.dimensions = dimensions; //TODO do we really need a session and a list of dimensions? are they the same?
+        this.activeChoices = activeChoices;
+        this.markers = markers;
     }
 
     serialize() {
-        return {data: {panel: this.panel, session: this.session, dimensions: this.dimensions,
-                activeChoices: this.activeChoices, markers: this.markers}, deserializer: "VJavaUI"};
+        return {
+            data: {
+                panel: this.panel, session: this.session, dimensions: this.dimensions,
+                activeChoices: this.activeChoices, markers: this.markers
+            }, deserializer: "VJavaUI"
+        };
     }
 
     hasDimension(name: string): boolean {
@@ -115,18 +121,19 @@ export class VJavaUI {
                 this.dimensions.push({ name: dimName, color: sessionColor, colorpicker: null })
                 color = sessionColor;
             } else {
-                this.dimensions.push({ name: dimName, color: '#6ea6ab', colorpicker: null })
+                this.dimensions.push({ name: dimName, color: 'rgb(127, 71, 62)', colorpicker: null })
                 color = 'rgb(127, 71, 62)';
             }
         }
         return color;
     }
 
-    setupColorPickerForDim(dimName: string, editor: AtomCore.IEditor): DimensionUI {
+    setupColorPickerForDim(dimName: string): DimensionUI {
         var dimUIElement;
+        var color = this.getColorForDim(dimName);
         dimUIElement = this.getDimUIElementByName(dimName);
         dimUIElement.colorpicker = $(`#${dimName}-colorpicker`).spectrum({
-            color: this.getColorForDim(dimName),
+            color: color,
             preferredFormat: 'rgb'
         });
         return dimUIElement;
@@ -147,14 +154,14 @@ export class VJavaUI {
     }
 
     shouldBeChecked(dimStatus: DimensionStatus, dimName: string) {
-      var selector = this.getSelector(dimName);
-      if(dimStatus === 'DEF') {
-        return (selector && selector.status === dimStatus) ? 'checked' : ''
-      } else if(dimStatus === 'NDEF') {
-        return (selector && selector.status === dimStatus) ? 'checked' : ''
-      } else if(dimStatus === 'BOTH') {
-        return (!selector || selector.status === dimStatus) ? 'checked' : ''
-      }
+        var selector = this.getSelector(dimName);
+        if (dimStatus === 'DEF') {
+            return (selector && selector.status === dimStatus) ? 'checked' : ''
+        } else if (dimStatus === 'NDEF') {
+            return (selector && selector.status === dimStatus) ? 'checked' : ''
+        } else if (dimStatus === 'BOTH') {
+            return (!selector || selector.status === dimStatus) ? 'checked' : ''
+        }
     }
 }
 
