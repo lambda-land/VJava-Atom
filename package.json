@@ -22,10 +22,11 @@
     "typescript": "2.9.2"
   },
   "scripts": {
-    "atominstall": "npm run compile && npm run css && apm link",
+    "atominstall": "npm run build && apm link",
+    "build": "npm run compile && npm run css",
     "compile": "tsc",
     "css": "cp node_modules/spectrum-colorpicker/spectrum.css styles/",
-    "develop": "apm link --dev && atom --dev ./ && npm run watch",
+    "develop": "npm run build && apm link --dev && atom --dev ./ && npm run watch",
     "watch": "tsc --watch --preserveWatchOutput"
   }
 }
