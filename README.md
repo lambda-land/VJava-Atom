@@ -46,7 +46,32 @@ The `atominstall` command creates a link to Atoms package directory (typically
 under ~/.atom/packages) using Atoms built in command line utility. Any changes
 made to this package will propogate to Atom (after Atom is restarted).
 
-## Debugging
+## Developing
+
+Run the command:
+
+```bash
+npm run develop
+```
+
+to watch the TypeScript files for changes and open the editor in development
+mode. To reload Atom in development mode, use the key binding `ALT+CTRL+R`.
+Since Atom is build on the Chrome browser, the developer console can be
+accessed with the key binding `CTRL+SHIFT+I`.
+
+To watch the TypeScript files for changes, run:
+
+```bash
+npm run watch
+```
+
+To compile the package after making changes without watching, run:
+
+```bash
+npm run compile
+```
+
+### Session State
 
 When developing, there may be instances where the state of the plugin is saved
 across Atom sessions. To delete this state run the command:

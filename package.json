@@ -16,14 +16,16 @@
     "@types/atom": "1.28.0",
     "@types/q": "1.5.0",
     "@types/spectrum": "1.5.29",
-    "@types/text-buffer": "^13.0.4",
+    "@types/text-buffer": "13.0.4",
     "jquery": "3.3.1",
     "spectrum-colorpicker": "1.8.0",
     "typescript": "2.9.2"
   },
   "scripts": {
+    "atominstall": "npm run compile && npm run css && apm link",
     "compile": "tsc",
-    "develop": "npm run compile && atom -d example.c",
-    "atominstall": "npm run compile && apm link"
+    "css": "cp node_modules/spectrum-colorpicker/spectrum.css styles/",
+    "develop": "apm link --dev && atom --dev ./ && npm run watch",
+    "watch": "tsc --watch --preserveWatchOutput"
   }
 }
