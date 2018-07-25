@@ -35,10 +35,12 @@ cp -v `stack exec which variational-parser` /path/to/variational-editor-atom/lib
 ### Linking to Atom
 
 Clone the repository, copy the variational-parser executable to the lib/
-directory, then run the `atominstall` command from the project root.
+directory, install npm packages, then run the `atominstall` command
+from the project root.
 
 ```bash
 cd variational-editor-atom
+npm install
 npm run atominstall
 ```
 
@@ -59,22 +61,11 @@ mode. To reload Atom in development mode, use the key binding `ALT+CTRL+R`.
 Since Atom is build on the Chrome browser, the developer console can be
 accessed with the key binding `CTRL+SHIFT+I`.
 
-To watch the TypeScript files for changes, run:
-
-```bash
-npm run watch
-```
-
-To compile the package after making changes without watching, run:
-
-```bash
-npm run compile
-```
-
 ### Session State
 
 When developing, there may be instances where the state of the plugin is saved
-across Atom sessions. To delete this state run the command:
+across Atom sessions (although this shouldn't be the case in development mode).
+To delete this state run the command:
 
 ```bash
 atom --clear-window-state
@@ -95,3 +86,18 @@ with TypeScript and Atom.
 
 * [TypeScript Deep Dive](https://basarat.gitbooks.io/typescript/)
 * [Atom Flight Manual](https://flight-manual.atom.io/) (Especially chapter 3)
+
+## Contributing
+
+### Adding dependencies from DefinitelyTyped
+
+DefinitelyTyped publishes type definition files for thousands of existing JS
+packages to allow compatibility with TypeScript. Most of these packages have a
+procedurally generated package.json file that does not specify versions for
+their dependencies. This results in inconsistent builds and can break the
+dependencies this package relies on.
+
+In order to avoid this issue, *all* `@types` packages, including dependencies
+of dependencies and so on, should be specified in the package.json file for
+the Variational Editor Atom plugin. To find all `@types` packages installed by
+npm run `npm list`.
