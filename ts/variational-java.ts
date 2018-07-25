@@ -106,7 +106,8 @@ const mainDivId = 'variationalJavaUI';
 const enclosingDivId = 'enclosingDivJavaUI';
 const secondaryDivId = 'variationalJavaUIButtons';
 
-var iconsPath = atom.packages.resolvePackagePath("variational-java") + "/icons";
+var iconsPath = path.resolve(atom.packages.resolvePackagePath("variational-editor-atom"),
+    "icons");
 
 class VJava {
 
