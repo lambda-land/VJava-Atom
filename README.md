@@ -58,14 +58,13 @@ npm run develop
 
 to watch the TypeScript files for changes and open the editor in development
 mode. To reload Atom in development mode, use the key binding `ALT+CTRL+R`.
-Since Atom is build on the Chrome browser, the developer console can be
+Since Atom is built on the Chrome browser, the developer console can be
 accessed with the key binding `CTRL+SHIFT+I`.
 
 ### Session State
 
 When developing, there may be instances where the state of the plugin is saved
-across Atom sessions (although this shouldn't be the case in development mode).
-To delete this state run the command:
+across Atom sessions. To delete this state run the command:
 
 ```bash
 atom --clear-window-state
@@ -79,13 +78,10 @@ package state.
 
 ---
 
-## Resources
+## Testing
 
-The following resources are a good place to start for getting up and running
-with TypeScript and Atom.
-
-* [TypeScript Deep Dive](https://basarat.gitbooks.io/typescript/)
-* [Atom Flight Manual](https://flight-manual.atom.io/) (Especially chapter 3)
+Tests can be run on the command line with `npm run test` or when this project
+is open in Atom with the key binding `CTRL+SHIFT+Y`.
 
 ## Contributing
 
@@ -101,3 +97,11 @@ In order to avoid this issue, *all* `@types` packages, including dependencies
 of dependencies and so on, should be specified in the package.json file for
 the Variational Editor Atom plugin. To find all `@types` packages installed by
 npm run `npm list`.
+
+## Resources
+
+The following resources are a good place to start for getting up and running
+with TypeScript and Atom.
+
+* [TypeScript Deep Dive](https://basarat.gitbooks.io/typescript/)
+* [Atom Flight Manual](https://flight-manual.atom.io/) (Especially chapter 3)

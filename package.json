@@ -32,6 +32,10 @@
     "compile": "tsc",
     "css": "cp node_modules/spectrum-colorpicker/spectrum.css styles/",
     "develop": "npm run build && apm link --dev && atom --dev ./ && npm run watch",
+    "test": "atom --test spec",
     "watch": "tsc --watch --preserveWatchOutput"
+  },
+  "devDependencies": {
+    "temp": "^0.8.3"
   }
 }

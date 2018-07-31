@@ -137,8 +137,8 @@ class VJava {
                            </div></div>`);
         this.ui.panel = atom.workspace.addRightPanel({ item: mainUIElement });
         this.ui.panel.hide();
-        this.ui.main = $(`#${mainDivId}`);
-        this.ui.secondary = $(`#${secondaryDivId}`);
+        this.ui.main = mainUIElement.find(`#${mainDivId}`);
+        this.ui.secondary = mainUIElement.find(`#${secondaryDivId}`);
         this.ui.message = this.ui.main.find("#message");
         this.ui.markers = [];
 
@@ -212,7 +212,7 @@ class VJava {
                 this.ui.main.append(dimDiv);
 
 
-                document.getElementById('removeDimension-' + dimName).addEventListener("click", () => {
+                $('#removeDimension-' + dimName).on("click", () => {
                     this.removeDimension(dimName);
                 });
 
@@ -452,7 +452,7 @@ class VJava {
                 this.ui.main.append(dimDiv);
 
                 //only hook up listeners, etc. once!
-                document.getElementById('removeDimension-' + node.name).addEventListener("click", () => {
+                $('#removeDimension-' + node.name).on("click", () => {
                     this.removeDimension(node.name);
                 });
 
