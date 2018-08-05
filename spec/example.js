@@ -1,6 +1,6 @@
 'use babel';
 
-export var exampleFile = `int dummy() {
+export const exampleFile = `int dummy() {
       x = 10;
 
 #ifdef DEC
@@ -36,6 +36,47 @@ new dimension
 #ifndef BIG
 new dimension
 #endif
+6
+7
+8
+`;
+
+export const exampleTempFile = `int dummy() {
+      x = 10;
+
+
+      x = x - 1;
+
+      x = x + 1;
+
+
+
+
+      x = x * 5;
+
+      x = x * 2;
+
+
+
+      x = x / 5;
+
+
+      return x;
+
+
+
+new dimension
+
+
+  }
+
+1
+2
+3
+4
+
+new dimension
+
 6
 7
 8

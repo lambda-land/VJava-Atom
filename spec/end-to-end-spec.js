@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as temp from 'temp';
 
-import { exampleFile } from './example';
+import { exampleFile, exampleTempFile } from './example';
 import { sidePanelHTML } from './sidePanelHTML';
 
 temp.track();  // Allows temp package to clean up temp files/directories after exit.
@@ -45,7 +45,9 @@ describe('end to end tests', () => {
   // The tests in this block provide basic sanity checks.
   describe('sanity tests', () => {
     it ('ensures the active editor is the proper file', () => {
-      expect(atom.workspace.getActiveTextEditor().getTitle()).toBe(fileName);
+      const editor = atom.workspace.getActiveTextEditor();
+      expect(editor.getTitle()).toBe(fileName);
+      expect(editor.getText()).toBe(exampleFile);
     });
 
     it ('ensures the new file is created when variational-java is toggled', () => {
@@ -66,8 +68,10 @@ describe('end to end tests', () => {
       });
 
       runs(() => {
+        const editor = atom.workspace.getActiveTextEditor();
         expect(fs.existsSync(filePathVJava)).toBe(true);
-        expect(atom.workspace.getActiveTextEditor().getTitle()).toBe(fileNameVJava);
+        expect(editor.getTitle()).toBe(fileNameVJava);
+        expect(editor.getText()).toBe(exampleTempFile);
 
         // Untoggle the variational-java command.
         atom.commands.dispatch(workspaceElement, 'variational-java:toggle');
@@ -117,6 +121,49 @@ describe('end to end tests', () => {
 
         // The side panel should be gone.
         expect(atom.workspace.getRightPanels().length).toBe(0);
+      });
+    });
+
+    it('shows and hides the temporary file', () => {
+      // This is an activation event, triggering it will cause the package to be
+      // activated.
+      atom.commands.dispatch(workspaceElement, 'variational-java:toggle');
+
+      waitsForPromise(() => {
+        return activationPromise.then(() => {
+          // The parseVJava method called when the package is toggled on spawns
+          // a process and calls a callback. The method returns before the process
+          // and callback finish executing causing the activationPromise to think
+          // the package activation is finished when it really isn't. Set a timeout
+          // for the time being to allow the package to finish its work before
+          // testing expectations.
+          waits(2500);
+        });
+      });
+
+      runs(() => {
+        // Check the decoration markers are present on the editor.
+        let editor = atom.workspace.getActiveTextEditor();
+        expect(editor.getDecorations({class: 'dimension-marker-DEC-defbranch'}).length).toBe(2);
+        expect(editor.getDecorations({class: 'dimension-marker-DEC-ndefbranch'}).length).toBe(1);
+        expect(editor.getDecorations({class: 'dimension-marker-MULT-defbranch'}).length).toBe(1);
+        expect(editor.getDecorations({class: 'dimension-marker-MULT-ndefbranch'}).length).toBe(1);
+        expect(editor.getDecorations({class: 'dimension-marker-BIG-defbranch'}).length).toBe(1);
+        expect(editor.getDecorations({class: 'dimension-marker-BIG-ndefbranch'}).length).toBe(2);
+
+        // Untoggle the variational-java command.
+        atom.commands.dispatch(workspaceElement, 'variational-java:toggle');
+        waits(2500);
+
+        // Check the decoration markers are no longer present on the editor.
+        // Unlock these tests while refactoring the teardown process.
+        /* editor = atom.workspace.getActiveTextEditor();
+         * expect(editor.getDecorations({class: 'dimension-marker-DEC-defbranch'}).length).toBe(0);
+         * expect(editor.getDecorations({class: 'dimension-marker-DEC-ndefbranch'}).length).toBe(0);
+         * expect(editor.getDecorations({class: 'dimension-marker-MULT-defbranch'}).length).toBe(0);
+         * expect(editor.getDecorations({class: 'dimension-marker-MULT-ndefbranch'}).length).toBe(0);
+         * expect(editor.getDecorations({class: 'dimension-marker-BIG-defbranch'}).length).toBe(0);
+         * expect(editor.getDecorations({class: 'dimension-marker-BIG-ndefbranch'}).length).toBe(0);*/
       });
     });
   });
