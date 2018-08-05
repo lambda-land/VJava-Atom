@@ -5,11 +5,6 @@ import { Branch, Selector } from './variational-editor-view';
 
 type Pos = [number, number]; // row, column
 
-export interface Span {
-    start: Pos;
-    end: Pos;
-}
-
 export interface ContentNode {
     type: "text";
     content: string;
@@ -379,16 +374,6 @@ export class AlternativeInserter extends SyntaxRewriter {
 
         return [newNode];
     }
-
-
-    // rewriteDocument(doc: RegionNode) {
-    //     //walk the span before and after we do the change, because spans have semantic meaning here
-    //     const walker = new SpanWalker();
-    //     walker.visitRegion(doc);
-    //     const newDoc = this.rewriteRegion(doc);
-    //     walker.visitRegion(newDoc);
-    //     return newDoc;
-    // }
 
     rewriteRegion(region: RegionNode): RegionNode {
         var newSegments: SegmentNode[] = []

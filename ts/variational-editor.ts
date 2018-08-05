@@ -17,7 +17,6 @@ import {
     NodeInserter,
     RegionNode,
     SegmentNode,
-    Span,
     ViewRewriter,
     docToPlainText,
     getSelectionForDim,
@@ -25,53 +24,14 @@ import {
     isBranchActive,
     renderDocument,
 } from './ast';
-import { DimensionStatus, DimensionUI, NestLevel, Selector, VariationalEditorView } from './variational-editor-view'
-
-// ----------------------------------------------------------------------------
-
-declare global {
-    interface Array<T> {
-        last(): T | undefined;
-    }
-    namespace AtomCore {
-        interface IAtom {
-            tooltips: any;
-            contextMenu: any;
-        }
-
-        interface IDisplayBufferMarker {
-            onDidDestroy(cb: Function): void
-        }
-
-        interface IKeymapManager {
-            keyBindings: any;
-        }
-
-        interface IEditor {
-            getTextInBufferRange(span: Span): string;
-            getTextInBufferRange(span: number[][]): string;
-            decorateMarker(marker: any, options: any);
-        }
-        interface Panel {
-            destroy();
-        }
-    }
-
-    interface JQuery {
-        spectrum({ color });
-        spectrum(method: string);
-    }
-
-    interface CompositeDisposable {
-        destroy();
-    }
-}
-
-if (!Array.prototype.last) {
-    Array.prototype.last = function() {
-        return this[this.length - 1];
-    }
-}
+import {
+    Branch,
+    DimensionStatus,
+    DimensionUI,
+    NestLevel,
+    Selector,
+    VariationalEditorView
+} from './variational-editor-view'
 
 // ----------------------------------------------------------------------------
 
@@ -149,8 +109,6 @@ class VariationalEditor {
         $("#addNewDimension").on('mouseout', () => {
             $('#addNewDimensionImg').attr('src', `${iconsPath}/add_square_button.png`);
         });
-        // ---
-        // add listeners for ui buttons
 
         // TODO: this click handler needs a name and a place to live.
         $("#addNewDimension").on('click', () => {
@@ -161,7 +119,6 @@ class VariationalEditor {
                 color: 'rgb(127, 71, 62)'
             };
 
-            // goddamn, dude
             var nameDiv = $(`<div class='form-group dimension-ui-div' id='new-dimension'><h2><input id='new-dimension-name' class='native-key-bindings new-dimension-name' type='text' value='${dimName}'></h2></div>`)
 
             this.ui.main.append(nameDiv);
@@ -193,61 +150,12 @@ class VariationalEditor {
 
                 nameDiv.remove();
 
-                var dimDiv = $(`<div class='form-group dimension-ui-div' id='${dimName}'>
-                    <input class="colorpicker" id="${dimName}-colorpicker" value="ab2567">
-                    <h2>${dimName}</h2
-                    <br>
-                    <div class="switch-toggle switch-3 switch-candy">
-                        <input id="${dimName}-view-both" name="state-${dimName}" type="radio" checked="checked">
-                        <label for="${dimName}-view-both">BOTH</label>
-                        <br>
-                        <input id="${dimName}-view-thenbranch" name="state-${dimName}" type="radio" checked="">
-                        <label for="${dimName}-view-thenbranch">DEF</label>
-                        <br>
-                        <input id="${dimName}-view-elsebranch" name="state-${dimName}" type="radio">
-                        <label for="${dimName}-view-elsebranch">NDEF</label>
-                    </div>
-                    <a href='' id='removeDimension-${dimName}'><img id='removeDimensionImg' class='delete_icon' border="0" src="${iconsPath}/delete-bin.png" width="16" height="18"/> </a>
-                    <br></div>`);
-                this.ui.main.append(dimDiv);
-
-
-                $('#removeDimension-' + dimName).on("click", () => {
-                    this.removeDimension(dimName);
-                });
-
-                this.addViewListeners(dimension);
+                this.renderColorPicker(dimension.name);
 
                 this.ui.contextMenu.dispose();
                 this.preserveChanges(atom.workspace.getActiveTextEditor());
                 this.updateEditorText();
-                this.ui.menuItems.push({
-                    label: dimName,
-                    submenu: [{
-                        label: 'When Selected',
-                        command: 'variational-editor:add-choice-segment-' + dimName + '-selected'
-                    },
-                    {
-                        label: 'When Unselected',
-                        command: 'variational-editor:add-choice-segment-' + dimName + '-unselected'
-                    }]
-                })
-                var whenSelectedSub = {};
-                whenSelectedSub[`variational-editor:add-choice-segment-${dimName}-selected`] = () => this.addChoiceSegment(dimName, "DEF");
-                var whenUnselectedSub = {};
-                whenUnselectedSub[`variational-editor:add-choice-segment-${dimName}-unselected`] = () => this.addChoiceSegment(dimName, "NDEF");
                 this.ui.contextMenu = atom.contextMenu.add({ 'atom-text-editor': [{ label: 'Insert Choice', submenu: this.ui.menuItems }] });
-
-                this.subscriptions.add(atom.commands.add('atom-text-editor', whenSelectedSub));
-                this.subscriptions.add(atom.commands.add('atom-text-editor', whenUnselectedSub));
-
-                dimension.colorpicker = $(document.getElementById(dimension.name + '-colorpicker')).spectrum({
-                    color: dimension.color,
-                    preferredFormat: 'rgb'
-                }).on('change', () => {
-                    dimension.color = dimension.colorpicker.spectrum('get').toRgbString();
-                    this.updateDimensionColor(dimension);
-                });
 
                 this.ui.dimensions.push(dimension);
 
@@ -259,15 +167,15 @@ class VariationalEditor {
 
     addViewListeners(dimension: DimensionUI) {
         $(`#${dimension.name}-view-both`).on('click', () => {
-            this.unsetdimension(dimension.name);
+            this.unsetDimension(dimension.name);
         });
 
         $(`#${dimension.name}-view-elsebranch`).on('click', () => {
-            this.setdimensionundefined(dimension.name);
+            this.setDimensionUndefined(dimension.name);
         });
 
         $(`#${dimension.name}-view-thenbranch`).on('click', () => {
-            this.setdimensiondefined(dimension.name);
+            this.setDimensionDefined(dimension.name);
         });
     }
 
@@ -411,212 +319,182 @@ class VariationalEditor {
         this.ui.activeChoices.push(selection);
     }
 
+    // Generate a colorpicker for the dimension.
+    renderColorPicker(dimensionName: string) {
+        if (!this.ui.hasDimension(dimensionName)) {
+            var previousSelection = false;
+            for (var i = 0; i < this.ui.activeChoices.length; i++) {
+                if (this.ui.activeChoices[i].name === dimensionName) {
+                    previousSelection = true;
+                    break;
+                }
+            }
+            // default the selection to 'BOTH' if none has been made
+            if (!previousSelection) this.ui.activeChoices.push({ name: dimensionName, status: 'BOTH' });
+
+            var dimDiv = $(`<div class='form-group dimension-ui-div' id='${dimensionName}'>
+  <input class='colorpicker' type='text' id="${dimensionName}-colorpicker">
+  <h2>${dimensionName}</h2>
+  <br>
+  <div class="switch-toggle switch-3 switch-candy">
+
+    <input id="${dimensionName}-view-both" name="state-${dimensionName}" type="radio" ${this.ui.shouldBeChecked('BOTH', dimensionName)} >
+    <label for="${dimensionName}-view-both">BOTH</label>
+    <br>
+    <input id="${dimensionName}-view-thenbranch" name="state-${dimensionName}" type="radio" ${this.ui.shouldBeChecked('DEF', dimensionName)} >
+    <label for="${dimensionName}-view-thenbranch">DEF</label>
+    <br>
+    <input id="${dimensionName}-view-elsebranch" name="state-${dimensionName}" type="radio" ${this.ui.shouldBeChecked('NDEF', dimensionName)} >
+    <label for="${dimensionName}-view-elsebranch">NDEF</label>
+
+  </div>
+  <a href='' id='removeDimension-${dimensionName}' class='delete_icon'><img name='removeDimensionImg' border="0" src="${iconsPath}/delete-bin.png" width="16" height="18"/></a>
+  <br>
+</div>`);
+            this.ui.main.append(dimDiv);
+
+            //only hook up listeners, etc. once!
+            $('#removeDimension-' + dimensionName).on("click", () => {
+                this.removeDimension(dimensionName);
+            });
+
+            var menuItem = {
+                label: dimensionName,
+                submenu: [{
+                    label: 'When Selected',
+                    command: 'variational-editor:add-choice-segment-' + dimensionName + '-selected'
+                },
+                {
+                    label: 'When Unselected',
+                    command: 'variational-editor:add-choice-segment-' + dimensionName + '-unselected'
+                }]
+            }
+            this.ui.menuItems.push(menuItem);
+
+            var whenSelectedSub = {};
+            whenSelectedSub[`variational-editor:add-choice-segment-${dimensionName}-selected`] = () => this.addChoiceSegment(dimensionName, "DEF");
+            var whenUnselectedSub = {};
+            whenUnselectedSub[`variational-editor:add-choice-segment-${dimensionName}-unselected`] = () => this.addChoiceSegment(dimensionName, "NDEF");
+
+            this.subscriptions.add(atom.commands.add('atom-text-editor', whenSelectedSub));
+            this.subscriptions.add(atom.commands.add('atom-text-editor', whenUnselectedSub));
+
+            var dimUIElement = this.ui.setupColorPickerForDim(dimensionName);
+
+            dimUIElement.colorpicker.on('change', () => {
+                var rgba = dimUIElement.colorpicker.spectrum('get').toRgbString();
+                dimUIElement.color = rgba;
+
+                this.updateDimensionColor(dimUIElement);
+            });
+
+            this.addViewListeners(dimUIElement);
+        }
+    }
+
+    decorateDimension(editor: TextEditor, node: ChoiceNode, branch: Branch): void {
+        const otherBranch = branch === 'thenbranch' ? 'elsebranch' : 'thenbranch';
+
+        if (isBranchActive(node, getSelectionForNode(node, this.ui.activeChoices), branch) && node[branch].segments.length > 0 && !node[branch].hidden) {
+            //add markers for this new range of a (new or pre-existing) dimension
+            var branchMarker = editor.markBufferRange(node[branch].span, { invalidate: 'surround' });
+            this.ui.regionMarkers.push(branchMarker);
+
+            // Decorate with the appropriate css classes.
+            // Note: The use of positive and negative here is unrelated to
+            //       the positive and negative relation of DEF and NDEF.
+            let positiveCssClass: (any) => string, negativeCssClass: (any) => string;
+            let positiveDef: DimensionStatus, negativeDef: DimensionStatus;
+            let spanPos: string, markerPos: 'before' | 'after';
+            if (branch === 'thenbranch') {
+                positiveCssClass = getdefbranchCssClass;
+                negativeCssClass = getndefbranchCssClass;
+                positiveDef = 'DEF';
+                negativeDef = 'NDEF';
+                spanPos = 'end';
+                markerPos = 'after';
+            }
+            else {
+                positiveCssClass = getndefbranchCssClass;
+                negativeCssClass = getdefbranchCssClass;
+                positiveDef = 'NDEF';
+                negativeDef = 'DEF';
+                spanPos = 'start';
+                markerPos = 'before';
+            }
+
+            editor.decorateMarker(branchMarker, { type: 'line', class: node.kind === 'positive' ? positiveCssClass(node.name) : negativeCssClass(node.name) });
+            branchMarker.onDidDestroy(() => {
+                this.preserveChanges(editor);
+                this.updateEditorText();
+            });
+
+            var element = document.createElement('div');
+
+            for (var i = this.nesting.length - 1; i >= 0; i--) {
+                //nesting class format: 'nested-[DIM ID]-[STATUS]-[LEVEL]'
+                var nestclass = 'nested-' + this.nesting[i].selector.name + '-' + this.nesting[i].selector.status + '-' + i;
+                editor.decorateMarker(branchMarker, { type: 'line', class: nestclass });
+                element.classList.add(nestclass);
+            }
+
+            if (node[otherBranch].segments.length == 0 && node[otherBranch].hidden == false) {
+                element.textContent = '(+)';
+                element.classList.add(`insert-alt-${node.name}`);
+                element.classList.add(`insert-alt`);
+                element.classList.add(node.kind === 'positive' ? negativeCssClass(node.name) : positiveCssClass(node.name));
+
+                var hiddenMarker = editor.markBufferPosition(node[branch].span[spanPos]);
+                this.ui.markers.push(hiddenMarker);
+                editor.decorateMarker(
+                    hiddenMarker,
+                    {
+                        type: 'block',
+                        position: markerPos,
+                        item: element
+                    });
+
+                var veditor = this;
+                element.onclick = () => {
+                    veditor.preserveChanges(editor);
+                    var newNode: ContentNode = {
+                        type: "text",
+                        content: branch === 'thenbranch' ? '\n\n' : '\n'
+                    };
+                    var inserter = new AlternativeInserter(newNode, branchMarker.getBufferRange()[spanPos], otherBranch, node.name);
+                    veditor.doc = inserter.rewriteDocument(veditor.doc);
+                    veditor.updateEditorText();
+                };
+            } else if (node[otherBranch].hidden && node[otherBranch].segments.length > 0) {
+                element.textContent = '(...)';
+                element.classList.add(`hover-alt-${node.name}`);
+                element.classList.add(`hover-alt`);
+                element.classList.add(node.kind === 'positive' ? negativeCssClass(node.name) : positiveCssClass(node.name));
+                this.popupListenerQueue.push({ element: element, text: renderDocument(node[otherBranch]) });
+
+                var hiddenMarker = editor.markBufferPosition(node[branch].span[spanPos]);
+                this.ui.markers.push(hiddenMarker);
+                editor.decorateMarker(hiddenMarker, { type: 'block', position: markerPos, item: element });
+                element.onclick = () => { $(`#${node.name}-view-both`).click(); };
+            }
+
+            this.nesting.push({ selector: { name: node.name, status: (node.kind === 'positive') ? positiveDef : negativeDef }, dimension: node });
+            // Recurse on child branches.
+            for (var i = 0; i < node[branch].segments.length; i++) {
+                this.renderDimensionUI(editor, node[branch].segments[i]);
+            }
+            this.nesting.pop();
+        }
+    }
+
     //using the list of dimensions contained within the ui object,
     //add html elements, markers, and styles to distinguish dimensions for the user
     renderDimensionUI(editor: TextEditor, node: SegmentNode) {
-
         //if this is a dimension
         if (node.type === "choice") {
-
-            //and this dimension has not yet been parsed
-            if (!this.ui.hasDimension(node.name)) {
-                var previousSelection = false;
-                for (var i = 0; i < this.ui.activeChoices.length; i++) {
-                    if (this.ui.activeChoices[i].name === node.name) {
-                        previousSelection = true;
-                        break;
-                    }
-                }
-                // default the selection to 'BOTH' if none has been made
-                if (!previousSelection) this.ui.activeChoices.push({ name: node.name, status: 'BOTH' });
-
-                var dimDiv = $(`<div class='form-group dimension-ui-div' id='${node.name}'>
-              <input class='colorpicker' type='text' id="${node.name}-colorpicker">
-              <h2>${node.name}</h2>
-              <br>
-              <div class="switch-toggle switch-3 switch-candy">
-
-                  <input id="${node.name}-view-both" name="state-${node.name}" type="radio" ${this.ui.shouldBeChecked('BOTH', node.name)} >
-                  <label for="${node.name}-view-both">BOTH</label>
-                  <br>
-                  <input id="${node.name}-view-thenbranch" name="state-${node.name}" type="radio" ${this.ui.shouldBeChecked('DEF', node.name)} >
-                  <label for="${node.name}-view-thenbranch">DEF</label>
-                  <br>
-                  <input id="${node.name}-view-elsebranch" name="state-${node.name}" type="radio" ${this.ui.shouldBeChecked('NDEF', node.name)} >
-                  <label for="${node.name}-view-elsebranch">NDEF</label>
-
-                  <a></a>
-              </div>
-              <a href='' id='removeDimension-${node.name}' class='delete_icon'><img name='removeDimensionImg' border="0" src="${iconsPath}/delete-bin.png" width="16" height="18"/> </a>
-              <br></div>  `);
-                this.ui.main.append(dimDiv);
-
-                //only hook up listeners, etc. once!
-                $('#removeDimension-' + node.name).on("click", () => {
-                    this.removeDimension(node.name);
-                });
-
-
-
-                var menuItem = {
-                    label: node.name,
-                    submenu: [{
-                        label: 'When Selected',
-                        command: 'variational-editor:add-choice-segment-' + node.name + '-selected'
-                    },
-                    {
-                        label: 'When Unselected',
-                        command: 'variational-editor:add-choice-segment-' + node.name + '-unselected'
-                    }]
-                }
-                var whenSelectedSub = {};
-                whenSelectedSub[`variational-editor:add-choice-segment-${node.name}-selected`] = () => this.addChoiceSegment(node.name, "DEF");
-                var whenUnselectedSub = {};
-                whenUnselectedSub[`variational-editor:add-choice-segment-${node.name}-unselected`] = () => this.addChoiceSegment(node.name, "NDEF");
-
-                this.subscriptions.add(atom.commands.add('atom-text-editor', whenSelectedSub));
-                this.subscriptions.add(atom.commands.add('atom-text-editor', whenUnselectedSub));
-
-                this.ui.menuItems.push(menuItem);
-
-                var dimUIElement = this.ui.setupColorPickerForDim(node.name);
-
-                dimUIElement.colorpicker.on('change', () => {
-                    var rgba = dimUIElement.colorpicker.spectrum('get').toRgbString();
-                    dimUIElement.color = rgba;
-
-                    this.updateDimensionColor(dimUIElement);
-                });
-
-                this.addViewListeners(dimUIElement);
-            }
-
-
-            if (isBranchActive(node, getSelectionForNode(node, this.ui.activeChoices), "thenbranch") && node.thenbranch.segments.length > 0 && !node.thenbranch.hidden) {
-                //add markers for this new range of a (new or pre-existing) dimension
-                var thenbranchMarker = editor.markBufferRange(node.thenbranch.span, { invalidate: 'surround' });
-                this.ui.regionMarkers.push(thenbranchMarker);
-
-                //decorate with the appropriate css classes
-                editor.decorateMarker(thenbranchMarker, { type: 'line', class: node.kind === 'positive' ? getdefbranchCssClass(node.name) : getndefbranchCssClass(node.name) });
-                thenbranchMarker.onDidDestroy(() => {
-                    this.preserveChanges(editor);
-                    this.updateEditorText();
-                });
-
-                var element = document.createElement('div');
-
-                for (var i = this.nesting.length - 1; i >= 0; i--) {
-                    //nesting class format: 'nested-[DIM ID]-[STATUS]-[LEVEL]'
-                    var nestclass = 'nested-' + this.nesting[i].selector.name + '-' + this.nesting[i].selector.status + '-' + i;
-                    editor.decorateMarker(thenbranchMarker, { type: 'line', class: nestclass });
-                    element.classList.add(nestclass);
-                }
-
-                if (node.elsebranch.segments.length == 0 && node.elsebranch.hidden == false) {
-                    element.textContent = '(+)';
-                    element.classList.add(`insert-alt-${node.name}`);
-                    element.classList.add(`insert-alt`);
-                    element.classList.add(node.kind === 'positive' ? getndefbranchCssClass(node.name) : getdefbranchCssClass(node.name));
-
-                    var elseHiddenMarker = editor.markBufferPosition(node.thenbranch.span.end);
-                    this.ui.markers.push(elseHiddenMarker);
-                    editor.decorateMarker(elseHiddenMarker, { type: 'block', position: 'after', item: element });
-                    var veditor = this;
-                    element.onclick = () => {
-                        veditor.preserveChanges(editor);
-                        var newNode: ContentNode = {
-                            type: "text",
-                            content: "\n\n"
-                        };
-                        var inserter = new AlternativeInserter(newNode, thenbranchMarker.getBufferRange().end, "elsebranch", node.name);
-                        veditor.doc = inserter.rewriteDocument(veditor.doc);
-                        veditor.updateEditorText();
-                    };
-                } else if (node.elsebranch.hidden && node.elsebranch.segments.length > 0) {
-                    element.textContent = '(...)';
-                    element.classList.add(`hover-alt-${node.name}`);
-                    element.classList.add(`hover-alt`);
-                    element.classList.add(node.kind === 'positive' ? getndefbranchCssClass(node.name) : getdefbranchCssClass(node.name));
-                    this.popupListenerQueue.push({ element: element, text: renderDocument(node.elsebranch) });
-
-                    var elseHiddenMarker = editor.markBufferPosition(node.thenbranch.span.end);
-                    this.ui.markers.push(elseHiddenMarker);
-                    editor.decorateMarker(elseHiddenMarker, { type: 'block', position: 'after', item: element });
-                    element.onclick = () => { $(`#${node.name}-view-both`).click(); };
-                }
-
-                this.nesting.push({ selector: { name: node.name, status: (node.kind === 'positive') ? "DEF" : "NDEF" }, dimension: node });
-                //recurse on thenbranch and elsebranch
-                for (var i = 0; i < node.thenbranch.segments.length; i++) {
-                    this.renderDimensionUI(editor, node.thenbranch.segments[i]);
-                }
-                this.nesting.pop();
-            }
-
-            if (isBranchActive(node, getSelectionForNode(node, this.ui.activeChoices), "elsebranch") && node.elsebranch.segments.length > 0 && !node.elsebranch.hidden) {
-
-                var elsebranchMarker = editor.markBufferRange(node.elsebranch.span, { invalidate: 'surround' });
-                elsebranchMarker.onDidDestroy(() => {
-                    this.preserveChanges(editor);
-                    this.updateEditorText();
-                });
-                this.ui.regionMarkers.push(elsebranchMarker);
-
-                var element = document.createElement('div');
-                editor.decorateMarker(elsebranchMarker, { type: 'line', class: node.kind === 'positive' ? getndefbranchCssClass(node.name) : getdefbranchCssClass(node.name) });
-
-                for (var i = this.nesting.length - 1; i >= 0; i--) {
-                    //nesting class format: 'nested-[DIM ID]-[BRANCH]-[LEVEL]'
-                    var nestclass = 'nested-' + this.nesting[i].selector.name + '-' + this.nesting[i].selector.status + '-' + i;
-                    editor.decorateMarker(elsebranchMarker, { type: 'line', class: nestclass });
-                    element.classList.add(nestclass);
-                }
-
-
-                if (node.thenbranch.segments.length == 0 && node.thenbranch.hidden == false) {
-                    element.textContent = '(+)';
-                    element.classList.add(`insert-alt-${node.name}`);
-                    element.classList.add(`insert-alt`);
-                    element.classList.add(node.kind === 'positive' ? getdefbranchCssClass(node.name) : getndefbranchCssClass(node.name));
-
-                    var thenHiddenMarker = editor.markBufferPosition(node.elsebranch.span.start);
-                    this.ui.markers.push(thenHiddenMarker);
-                    editor.decorateMarker(thenHiddenMarker, { type: 'block', position: 'before', item: element });
-                    var veditor = this;
-                    element.onclick = () => {
-                        veditor.preserveChanges(editor);
-                        var newNode: ContentNode = {
-                            type: "text",
-                            content: "\n"
-                        };
-                        var inserter = new AlternativeInserter(newNode, elsebranchMarker.getBufferRange().start, "thenbranch", node.name);
-                        veditor.doc = inserter.rewriteDocument(veditor.doc);
-                        veditor.updateEditorText();
-                    };
-                } else if (node.thenbranch.hidden && node.thenbranch.segments.length > 0) {
-                    element.textContent = '(...)';
-                    element.classList.add(`hover-alt-${node.name}`);
-                    element.classList.add(`hover-alt`);
-                    element.classList.add(node.kind === 'positive' ? getdefbranchCssClass(node.name) : getndefbranchCssClass(node.name));
-
-                    this.popupListenerQueue.push({ element: element, text: renderDocument(node.thenbranch) });
-
-                    var thenHiddenMarker = editor.markBufferPosition(node.elsebranch.span.start);
-                    this.ui.markers.push(thenHiddenMarker);
-                    editor.decorateMarker(thenHiddenMarker, { type: 'block', position: 'before', item: element });
-                    element.onclick = () => { $(`#${node.name}-view-both`).click(); };
-                }
-
-
-                this.nesting.push({ selector: { name: node.name, status: (node.kind === 'positive') ? "NDEF" : "NDEF" }, dimension: node });
-                for (var i = 0; i < node.elsebranch.segments.length; i++) {
-                    this.renderDimensionUI(editor, node.elsebranch.segments[i]);
-                }
-                this.nesting.pop();
-            }
-
-
+            this.renderColorPicker(node.name);
+            this.decorateDimension(editor, node, 'thenbranch');
+            this.decorateDimension(editor, node, 'elsebranch');
         } else {
             var m = editor.markBufferRange(node.span, { invalidate: 'surround' });
             this.ui.markers.push(m);
@@ -633,7 +511,7 @@ class VariationalEditor {
             for (var i = 0; i < this.ui.dimensions.length; i++) {
                 if (this.ui.dimensions[i].name === dimName) {
                     this.ui.dimensions.splice(i, 1);
-                    $("#" + dimName).remove(); //TODO: can I remove this?
+                    $("#" + dimName).remove();
                 }
             }
             var selection: Selector = getSelectionForDim(dimName, this.ui.activeChoices);
@@ -644,8 +522,9 @@ class VariationalEditor {
         }
     }
 
-    //thenbranch and elsebranch represent whether the thenbranch and elsebranch branches should be promoted
-    //a value of 'true' indicates that the content in that branch should be promoted
+    // Thenbranch and elsebranch represent whether the thenbranch and elsebranch
+    // branches should be promoted. A value of 'true' indicates that the content
+    // in that branch should be promoted.
     deleteDimension(selection: Selector) {
         //if this is the dimension being promoted, then do that
         this.preserveChanges(atom.workspace.getActiveTextEditor());
@@ -689,6 +568,9 @@ class VariationalEditor {
         parserProcess.stdout.on('data', (chunk) => {
             data += chunk.toString();
         });
+        // Currently `code` isn't used, but it's required because the process
+        // passes a code to this function. For now ignore any typescript
+        // warnings about its value never being read.
         parserProcess.on('exit', (code) => {
             this.doc = JSON.parse(data);
             next();
@@ -698,32 +580,31 @@ class VariationalEditor {
         parserProcess.stdin.end();
     }
 
-    // these four functions execute a put with the old selections,
-    // then a pull with the new selections
-    // display both alternatives
-    // show the elsebranch alternative
-    setdimensionundefined(dimName: string) {
+    setDimension(dimName: string, status: DimensionStatus) {
         var editor = atom.workspace.getActiveTextEditor();
         this.preserveChanges(editor);
         for (var i = 0; i < this.ui.activeChoices.length; i++) {
             if (this.ui.activeChoices[i].name === dimName) {
-                this.ui.activeChoices[i].status = 'NDEF';
+                this.ui.activeChoices[i].status = status;
             }
         }
-        this.updateEditorText();
 
+        this.updateEditorText();
+    }
+
+    // show the thenbranch alternative
+    setDimensionDefined(dimName: string) {
+        this.setDimension(dimName, 'DEF');
+    }
+
+    // show the elsebranch alternative
+    setDimensionUndefined(dimName: string) {
+        this.setDimension(dimName, 'NDEF');
     }
 
     // hide the elsebranch alternative
-    unsetdimension(dimName: string) {
-        var editor = atom.workspace.getActiveTextEditor();
-        this.preserveChanges(editor);
-        for (var i = 0; i < this.ui.activeChoices.length; i++) {
-            if (this.ui.activeChoices[i].name === dimName) {
-                this.ui.activeChoices[i].status = 'BOTH';
-            }
-        }
-        this.updateEditorText();
+    unsetDimension(dimName: string) {
+        this.setDimension(dimName, 'BOTH');
     }
 
     updateEditorText() {
@@ -750,22 +631,6 @@ class VariationalEditor {
         this.popupListenerQueue = [];
 
         this.updateColors(showDoc);
-
-        // $('body').keydown((event) => { return this.KeyCheck(event)});
-
-    }
-
-    // show the thenbranch alternative
-    setdimensiondefined(dimName: string) {
-        var editor = atom.workspace.getActiveTextEditor();
-        this.preserveChanges(editor);
-        for (var i = 0; i < this.ui.activeChoices.length; i++) {
-            if (this.ui.activeChoices[i].name === dimName) {
-                this.ui.activeChoices[i].status = 'DEF';
-            }
-        }
-
-        this.updateEditorText();
     }
 
     activate(state) {
