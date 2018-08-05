@@ -25,7 +25,7 @@ import {
     isBranchActive,
     renderDocument,
 } from './ast';
-import { DimensionStatus, DimensionUI, NestLevel, Selector, VJavaUI } from './ui'
+import { DimensionStatus, DimensionUI, NestLevel, Selector, VariationalEditorView } from './variational-editor-view'
 
 // ----------------------------------------------------------------------------
 
@@ -102,18 +102,18 @@ function shadeColor(rgb: string, lum?: number) {
 }
 
 // the heck is this state doing here?
-const mainDivId = 'variationalJavaUI';
-const enclosingDivId = 'enclosingDivJavaUI';
-const secondaryDivId = 'variationalJavaUIButtons';
+const mainDivId = 'variationalEditorUI';
+const enclosingDivId = 'enclosingDivEditorUI';
+const secondaryDivId = 'variationalEditorUIButtons';
 
 var iconsPath = path.resolve(atom.packages.resolvePackagePath("variational-editor-atom"),
     "icons");
 
-class VJava {
+class VariationalEditor {
 
     styles: { [selector: string]: string } = {}
     nesting: NestLevel[] // a stack represented nested dimensions
-    ui: VJavaUI
+    ui: VariationalEditorView
     doc: RegionNode
     raw: string
     addChoiceLockout: boolean = false
@@ -129,10 +129,10 @@ class VJava {
     state: "parsed" | "unparsed"
 
     // initialize the user interface
-    // TODO: make this a function that returns an object conforming to VJavaUI
+    // TODO: make this a function that returns an object conforming to VariationalEditor
     createUI() {
         var mainUIElement = $(`<div id='${enclosingDivId}'><div id='${mainDivId}'></div>
-                           <div id='${secondaryDivId}' class='vjava-secondary'>
+                           <div id='${secondaryDivId}' class='veditor-secondary'>
                              <a href='' id='addNewDimension'><img id='addNewDimensionImg' border="0" src="${iconsPath}/add_square_button.png" width="30" height="30"/> </a>
                            </div></div>`);
         this.ui.panel = atom.workspace.addRightPanel({ item: mainUIElement });
@@ -225,17 +225,17 @@ class VJava {
                     label: dimName,
                     submenu: [{
                         label: 'When Selected',
-                        command: 'variational-java:add-choice-segment-' + dimName + '-selected'
+                        command: 'variational-editor:add-choice-segment-' + dimName + '-selected'
                     },
                     {
                         label: 'When Unselected',
-                        command: 'variational-java:add-choice-segment-' + dimName + '-unselected'
+                        command: 'variational-editor:add-choice-segment-' + dimName + '-unselected'
                     }]
                 })
                 var whenSelectedSub = {};
-                whenSelectedSub[`variational-java:add-choice-segment-${dimName}-selected`] = () => this.addChoiceSegment(dimName, "DEF");
+                whenSelectedSub[`variational-editor:add-choice-segment-${dimName}-selected`] = () => this.addChoiceSegment(dimName, "DEF");
                 var whenUnselectedSub = {};
-                whenUnselectedSub[`variational-java:add-choice-segment-${dimName}-unselected`] = () => this.addChoiceSegment(dimName, "NDEF");
+                whenUnselectedSub[`variational-editor:add-choice-segment-${dimName}-unselected`] = () => this.addChoiceSegment(dimName, "NDEF");
                 this.ui.contextMenu = atom.contextMenu.add({ 'atom-text-editor': [{ label: 'Insert Choice', submenu: this.ui.menuItems }] });
 
                 this.subscriptions.add(atom.commands.add('atom-text-editor', whenSelectedSub));
@@ -462,17 +462,17 @@ class VJava {
                     label: node.name,
                     submenu: [{
                         label: 'When Selected',
-                        command: 'variational-java:add-choice-segment-' + node.name + '-selected'
+                        command: 'variational-editor:add-choice-segment-' + node.name + '-selected'
                     },
                     {
                         label: 'When Unselected',
-                        command: 'variational-java:add-choice-segment-' + node.name + '-unselected'
+                        command: 'variational-editor:add-choice-segment-' + node.name + '-unselected'
                     }]
                 }
                 var whenSelectedSub = {};
-                whenSelectedSub[`variational-java:add-choice-segment-${node.name}-selected`] = () => this.addChoiceSegment(node.name, "DEF");
+                whenSelectedSub[`variational-editor:add-choice-segment-${node.name}-selected`] = () => this.addChoiceSegment(node.name, "DEF");
                 var whenUnselectedSub = {};
-                whenUnselectedSub[`variational-java:add-choice-segment-${node.name}-unselected`] = () => this.addChoiceSegment(node.name, "NDEF");
+                whenUnselectedSub[`variational-editor:add-choice-segment-${node.name}-unselected`] = () => this.addChoiceSegment(node.name, "NDEF");
 
                 this.subscriptions.add(atom.commands.add('atom-text-editor', whenSelectedSub));
                 this.subscriptions.add(atom.commands.add('atom-text-editor', whenUnselectedSub));
@@ -522,16 +522,16 @@ class VJava {
                     var elseHiddenMarker = editor.markBufferPosition(node.thenbranch.span.end);
                     this.ui.markers.push(elseHiddenMarker);
                     editor.decorateMarker(elseHiddenMarker, { type: 'block', position: 'after', item: element });
-                    var vjava = this;
+                    var veditor = this;
                     element.onclick = () => {
-                        vjava.preserveChanges(editor);
+                        veditor.preserveChanges(editor);
                         var newNode: ContentNode = {
                             type: "text",
                             content: "\n\n"
                         };
                         var inserter = new AlternativeInserter(newNode, thenbranchMarker.getBufferRange().end, "elsebranch", node.name);
-                        vjava.doc = inserter.rewriteDocument(vjava.doc);
-                        vjava.updateEditorText();
+                        veditor.doc = inserter.rewriteDocument(veditor.doc);
+                        veditor.updateEditorText();
                     };
                 } else if (node.elsebranch.hidden && node.elsebranch.segments.length > 0) {
                     element.textContent = '(...)';
@@ -583,16 +583,16 @@ class VJava {
                     var thenHiddenMarker = editor.markBufferPosition(node.elsebranch.span.start);
                     this.ui.markers.push(thenHiddenMarker);
                     editor.decorateMarker(thenHiddenMarker, { type: 'block', position: 'before', item: element });
-                    var vjava = this;
+                    var veditor = this;
                     element.onclick = () => {
-                        vjava.preserveChanges(editor);
+                        veditor.preserveChanges(editor);
                         var newNode: ContentNode = {
                             type: "text",
                             content: "\n"
                         };
                         var inserter = new AlternativeInserter(newNode, elsebranchMarker.getBufferRange().start, "thenbranch", node.name);
-                        vjava.doc = inserter.rewriteDocument(vjava.doc);
-                        vjava.updateEditorText();
+                        veditor.doc = inserter.rewriteDocument(veditor.doc);
+                        veditor.updateEditorText();
                     };
                 } else if (node.thenbranch.hidden && node.thenbranch.segments.length > 0) {
                     element.textContent = '(...)';
@@ -677,7 +677,7 @@ class VJava {
         return preserver.visitDocument(this.doc);
     }
 
-    parseVJava(textContents: string, next: () => void) {
+    parseVariation(textContents: string, next: () => void) {
         const packagePath = atom.packages.resolvePackagePath("variational-editor-atom");
 
         const parserPath = path.resolve(packagePath, "lib", "variational-parser");
@@ -690,7 +690,6 @@ class VJava {
             data += chunk.toString();
         });
         parserProcess.on('exit', (code) => {
-            console.log('child process exited with code ' + code);
             this.doc = JSON.parse(data);
             next();
         });
@@ -771,7 +770,7 @@ class VJava {
 
     activate(state) {
         this.state = "parsed"
-        this.ui = new VJavaUI(state);
+        this.ui = new VariationalEditorView(state);
 
         this.nesting = [];
         this.ui.menuItems = [];
@@ -783,7 +782,7 @@ class VJava {
         var contents = activeEditor.getText();
 
         //parse the file
-        this.parseVJava(contents, () => {
+        this.parseVariation(contents, () => {
             // Events subscribed to in atom's system can be easily cleaned up with a CompositeDisposable
             this.subscriptions = new CompositeDisposable();
 
@@ -793,12 +792,12 @@ class VJava {
 
             this.ui.contextMenu = atom.contextMenu.add({ 'atom-text-editor': [{ label: 'Insert Choice', submenu: this.ui.menuItems }] });
 
-            // Register command that toggles vjava view
+            // Register command that toggles veditor view
             this.subscriptions.add(atom.commands.add('atom-workspace', {
-                'variational-java:toggle': () => this.toggle()
+                'variational-editor:toggle': () => this.toggle()
             }));
             this.subscriptions.add(atom.commands.add('atom-workspace', {
-                'variational-java:undo': () => this.noUndoForYou()
+                'variational-editor:undo': () => this.noUndoForYou()
             }));
 
             atom.views.getView(activeEditor).addEventListener("keyup", (event) => { this.KeyUpCheck(event); });
@@ -811,7 +810,7 @@ class VJava {
 
             this.ui.panel.show();
             var pathBits = activeEditor.getPath().split('.');
-            activeEditor.saveAs(pathBits.splice(0, pathBits.length - 1).join('.') + '-temp-vjava.' + pathBits[pathBits.length - 1]);
+            activeEditor.saveAs(pathBits.splice(0, pathBits.length - 1).join('.') + '-temp-veditor.' + pathBits[pathBits.length - 1]);
         });
     }
 
@@ -868,7 +867,7 @@ class VJava {
     }
 
     getOriginalPath(path: string): string {
-        var pathBits = path.split('-temp-vjava'); //TODO is there a way to make this not a magic reserved file name?
+        var pathBits = path.split('-temp-veditor'); //TODO is there a way to make this not a magic reserved file name?
         var originalPath = pathBits.splice(0, pathBits.length).join('');
         return originalPath;
     }
@@ -882,7 +881,6 @@ class VJava {
             if (err) {
                 return console.log(err);
             }
-            console.log("The file was saved!");
         });
 
     }
@@ -971,7 +969,7 @@ class VJava {
             var contents = activeEditor.getText();
 
             //parse the file
-            this.parseVJava(contents, () => {
+            this.parseVariation(contents, () => {
 
 
                 this.ui.dimensions = [];
@@ -988,7 +986,7 @@ class VJava {
                 this.ui.panel.show();
 
                 var pathBits = activeEditor.getPath().split('.');
-                activeEditor.saveAs(pathBits.splice(0, pathBits.length - 1).join('.') + '-temp-vjava.' + pathBits[pathBits.length - 1]);
+                activeEditor.saveAs(pathBits.splice(0, pathBits.length - 1).join('.') + '-temp-veditor.' + pathBits[pathBits.length - 1]);
 
                 this.saveSubscription = activeEditor.onDidSave(this.handleDidSave.bind(this));
             });
@@ -997,4 +995,4 @@ class VJava {
 
 };
 
-export default new VJava();
+export default new VariationalEditor();

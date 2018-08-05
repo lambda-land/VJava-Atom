@@ -17,8 +17,8 @@ temp.track();  // Allows temp package to clean up temp files/directories after e
 // 
 
 describe('end to end tests', () => {
-  let activationPromise, filePath, filePathVJava, workspaceElement;
-  const fileName = 'example.c', fileNameVJava = 'example-temp-vjava.c';
+  let activationPromise, filePath, filePathVEditor, workspaceElement;
+  const fileName = 'example.c', fileNameVEditor = 'example-temp-veditor.c';
 
   // Set up editor with example file for tests.
   beforeEach(() => {
@@ -27,7 +27,7 @@ describe('end to end tests', () => {
     workspaceElement = atom.views.getView(atom.workspace);  // HTMLElement view.
 
     filePath = path.join(directory, fileName);  // Temp file to work on.
-    filePathVJava = path.join(directory, fileNameVJava);
+    filePathVEditor = path.join(directory, fileNameVEditor);
     fs.writeFileSync(filePath, exampleFile);
 
     waitsForPromise(() => {
@@ -50,14 +50,14 @@ describe('end to end tests', () => {
       expect(editor.getText()).toBe(exampleFile);
     });
 
-    it ('ensures the new file is created when variational-java is toggled', () => {
+    it ('ensures the new file is created when variational-editor is toggled', () => {
       // This is an activation event, triggering it will cause the package to be
       // activated.
-      atom.commands.dispatch(workspaceElement, 'variational-java:toggle');
+      atom.commands.dispatch(workspaceElement, 'variational-editor:toggle');
 
       waitsForPromise(() => {
         return activationPromise.then(() => {
-          // The parseVJava method called when the package is toggled on spawns
+          // The parseVariation method called when the package is toggled on spawns
           // a process and calls a callback. The method returns before the process
           // and callback finish executing causing the activationPromise to think
           // the package activation is finished when it really isn't. Set a timeout
@@ -69,20 +69,20 @@ describe('end to end tests', () => {
 
       runs(() => {
         const editor = atom.workspace.getActiveTextEditor();
-        expect(fs.existsSync(filePathVJava)).toBe(true);
-        expect(editor.getTitle()).toBe(fileNameVJava);
+        expect(fs.existsSync(filePathVEditor)).toBe(true);
+        expect(editor.getTitle()).toBe(fileNameVEditor);
         expect(editor.getText()).toBe(exampleTempFile);
 
-        // Untoggle the variational-java command.
-        atom.commands.dispatch(workspaceElement, 'variational-java:toggle');
+        // Untoggle the variational-editor command.
+        atom.commands.dispatch(workspaceElement, 'variational-editor:toggle');
         waits(2500);
 
-        expect(fs.existsSync(filePathVJava)).toBe(false);
+        expect(fs.existsSync(filePathVEditor)).toBe(false);
       });
     });
   });
 
-  describe('when the variational-java:toggle event is triggered', () => {
+  describe('when the variational-editor:toggle event is triggered', () => {
     it('shows and hides the side panel', () => {
       // Before the activation event the view is not on the DOM, and no panel
       // has been created
@@ -90,11 +90,11 @@ describe('end to end tests', () => {
 
       // This is an activation event, triggering it will cause the package to be
       // activated.
-      atom.commands.dispatch(workspaceElement, 'variational-java:toggle');
+      atom.commands.dispatch(workspaceElement, 'variational-editor:toggle');
 
       waitsForPromise(() => {
         return activationPromise.then(() => {
-          // The parseVJava method called when the package is toggled on spawns
+          // The parseVariation method called when the package is toggled on spawns
           // a process and calls a callback. The method returns before the process
           // and callback finish executing causing the activationPromise to think
           // the package activation is finished when it really isn't. Set a timeout
@@ -115,8 +115,8 @@ describe('end to end tests', () => {
         const sidePanel = sidePanels[0].item[0];
         expect(sidePanel.outerHTML).toBe(sidePanelHTML);
 
-        // Untoggle the variational-java command.
-        atom.commands.dispatch(workspaceElement, 'variational-java:toggle');
+        // Untoggle the variational-editor command.
+        atom.commands.dispatch(workspaceElement, 'variational-editor:toggle');
         waits(2500);
 
         // The side panel should be gone.
@@ -127,11 +127,11 @@ describe('end to end tests', () => {
     it('shows and hides the temporary file', () => {
       // This is an activation event, triggering it will cause the package to be
       // activated.
-      atom.commands.dispatch(workspaceElement, 'variational-java:toggle');
+      atom.commands.dispatch(workspaceElement, 'variational-editor:toggle');
 
       waitsForPromise(() => {
         return activationPromise.then(() => {
-          // The parseVJava method called when the package is toggled on spawns
+          // The parseVariation method called when the package is toggled on spawns
           // a process and calls a callback. The method returns before the process
           // and callback finish executing causing the activationPromise to think
           // the package activation is finished when it really isn't. Set a timeout
@@ -151,8 +151,8 @@ describe('end to end tests', () => {
         expect(editor.getDecorations({class: 'dimension-marker-BIG-defbranch'}).length).toBe(1);
         expect(editor.getDecorations({class: 'dimension-marker-BIG-ndefbranch'}).length).toBe(2);
 
-        // Untoggle the variational-java command.
-        atom.commands.dispatch(workspaceElement, 'variational-java:toggle');
+        // Untoggle the variational-editor command.
+        atom.commands.dispatch(workspaceElement, 'variational-editor:toggle');
         waits(2500);
 
         // Check the decoration markers are no longer present on the editor.

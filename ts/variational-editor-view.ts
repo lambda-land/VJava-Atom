@@ -28,7 +28,7 @@ export interface MenuItem {
 
 export type Branch = "thenbranch" | "elsebranch";
 
-export class VJavaUI {
+export class VariationalEditorView {
     panel: Panel;
     session: DimensionUI[];
     dimensions: DimensionUI[];
@@ -55,7 +55,7 @@ export class VJavaUI {
             data: {
                 panel: this.panel, session: this.session, dimensions: this.dimensions,
                 activeChoices: this.activeChoices, markers: this.markers
-            }, deserializer: "VJavaUI"
+            }, deserializer: "VariationalEditorView"
         };
     }
 

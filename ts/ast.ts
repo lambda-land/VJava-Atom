@@ -1,7 +1,7 @@
 'use babel'
 import { DisplayMarker, RangeLike, TextEditor } from 'atom';
 
-import { Branch, Selector } from './ui';
+import { Branch, Selector } from './variational-editor-view';
 
 type Pos = [number, number]; // row, column
 

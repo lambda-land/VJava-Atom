@@ -6,7 +6,7 @@ import $ from 'jquery';
 
 const variationalEditorPath = path.resolve(__dirname, '..'); // Project root directory.
 
-export const sidePanelHTML = `<div id="enclosingDivJavaUI"><div id="variationalJavaUI"><div class="form-group dimension-ui-div" id="DEC">
+export const sidePanelHTML = `<div id="enclosingDivEditorUI"><div id="variationalEditorUI"><div class="form-group dimension-ui-div" id="DEC">
               <input class="colorpicker" type="text" id="DEC-colorpicker">
               <h2>DEC</h2>
               <br>
@@ -61,6 +61,6 @@ export const sidePanelHTML = `<div id="enclosingDivJavaUI"><div id="variationalJ
               </div>
               <a href="" id="removeDimension-BIG" class="delete_icon"><img name="removeDimensionImg" border="0" src="${variationalEditorPath}/icons/delete-bin.png" width="16" height="18"> </a>
               <br></div></div>
-                           <div id="variationalJavaUIButtons" class="vjava-secondary">
+                           <div id="variationalEditorUIButtons" class="veditor-secondary">
                              <a href="" id="addNewDimension"><img id="addNewDimensionImg" border="0" src="${variationalEditorPath}/icons/add_square_button.png" width="30" height="30"> </a>
                            </div></div>`

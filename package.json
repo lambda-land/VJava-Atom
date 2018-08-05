@@ -1,11 +1,11 @@
 {
   "name": "variational-editor-atom",
-  "main": "./lib/variational-java",
+  "main": "./lib/variational-editor",
   "version": "0.7.5",
   "description": "An editor plugin supporting Variational Java development",
   "keywords": [],
   "activationCommands": {
-    "atom-workspace": "variational-java:toggle"
+    "atom-workspace": "variational-editor:toggle"
   },
   "repository": "https://github.com/lambda-land/variational-editor-atom",
   "license": "MIT",

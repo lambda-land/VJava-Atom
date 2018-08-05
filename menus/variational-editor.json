@@ -2,8 +2,8 @@
   "context-menu": {
     "atom-text-editor": [
       {
-        "label": "Toggle variational-java",
-        "command": "variational-java:toggle"
+        "label": "Toggle variational-editor",
+        "command": "variational-editor:toggle"
       }
     ]
   },
@@ -12,11 +12,11 @@
       "label": "Packages",
       "submenu": [
         {
-          "label": "variational-java",
+          "label": "variational-editor",
           "submenu": [
             {
               "label": "Toggle",
-              "command": "variational-java:toggle"
+              "command": "variational-editor:toggle"
             }
           ]
         }

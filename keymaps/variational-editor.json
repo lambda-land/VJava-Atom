@@ -1,0 +1,13 @@
+{
+  "atom-workspace": {
+  },
+
+  "atom-text-editor": {
+    "ctrl-alt-o": "variational-editor:toggle"
+
+  },
+  ".workspace .editor": {
+      "ctrl-z": "variational-editor:undo",
+      "cmd-z": "variational-editor:undo"
+  }
+}
