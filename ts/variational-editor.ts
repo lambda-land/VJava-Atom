@@ -769,49 +769,27 @@ class VariationalEditor {
     }
 
     activate(state) {
-        this.state = "parsed"
+        this.state = "unparsed"
         this.ui = new VariationalEditorView(state);
 
         this.nesting = [];
         this.ui.menuItems = [];
         this.popupListenerQueue = [];
+        this.subscriptions = new CompositeDisposable();
         this.tooltips = new CompositeDisposable();
 
-        var activeEditor = atom.workspace.getActiveTextEditor();
+        // Register command that toggles veditor view
+        this.subscriptions.add(atom.commands.add('atom-workspace', {
+            'variational-editor:toggle': () => this.toggle()
+        }));
+        this.subscriptions.add(atom.commands.add('atom-workspace', {
+            'variational-editor:undo': () => this.noUndoForYou()
+        }));
 
-        var contents = activeEditor.getText();
+        const editor = atom.workspace.getActiveTextEditor();
 
-        //parse the file
-        this.parseVariation(contents, () => {
-            // Events subscribed to in atom's system can be easily cleaned up with a CompositeDisposable
-            this.subscriptions = new CompositeDisposable();
-
-            this.createUI();
-
-            this.updateEditorText();
-
-            this.ui.contextMenu = atom.contextMenu.add({ 'atom-text-editor': [{ label: 'Insert Choice', submenu: this.ui.menuItems }] });
-
-            // Register command that toggles veditor view
-            this.subscriptions.add(atom.commands.add('atom-workspace', {
-                'variational-editor:toggle': () => this.toggle()
-            }));
-            this.subscriptions.add(atom.commands.add('atom-workspace', {
-                'variational-editor:undo': () => this.noUndoForYou()
-            }));
-
-            atom.views.getView(activeEditor).addEventListener("keyup", (event) => { this.KeyUpCheck(event); });
-            atom.views.getView(activeEditor).addEventListener("keydown", (event) => { this.KeyDownCheck(event); });
-
-            this.saveSubscription = activeEditor.onDidSave(this.handleDidSave.bind(this));
-
-            //preserve the contents for later comparison (put, get)
-            this.raw = contents;
-
-            this.ui.panel.show();
-            var pathBits = activeEditor.getPath().split('.');
-            activeEditor.saveAs(pathBits.splice(0, pathBits.length - 1).join('.') + '-temp-veditor.' + pathBits[pathBits.length - 1]);
-        });
+        atom.views.getView(editor).addEventListener("keyup", (event) => { this.KeyUpCheck(event); });
+        atom.views.getView(editor).addEventListener("keydown", (event) => { this.KeyDownCheck(event); });
     }
 
     // Currently `event` isn't used, but it's required because the event
