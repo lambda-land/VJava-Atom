@@ -63,7 +63,7 @@ describe('end to end tests', () => {
           // the package activation is finished when it really isn't. Set a timeout
           // for the time being to allow the package to finish its work before
           // testing expectations.
-          waits(2500);
+          waits(1000);
         });
       });
 
@@ -75,7 +75,7 @@ describe('end to end tests', () => {
 
         // Untoggle the variational-editor command.
         atom.commands.dispatch(workspaceElement, 'variational-editor:toggle');
-        waits(2500);
+        waits(1000);
 
         expect(fs.existsSync(filePathVEditor)).toBe(false);
       });
@@ -100,7 +100,7 @@ describe('end to end tests', () => {
           // the package activation is finished when it really isn't. Set a timeout
           // for the time being to allow the package to finish its work before
           // testing expectations.
-          waits(2500);
+          waits(1000);
         });
       });
 
@@ -117,7 +117,7 @@ describe('end to end tests', () => {
 
         // Untoggle the variational-editor command.
         atom.commands.dispatch(workspaceElement, 'variational-editor:toggle');
-        waits(2500);
+        waits(1000);
 
         // The side panel should be gone.
         expect(atom.workspace.getRightPanels().length).toBe(0);
@@ -137,7 +137,7 @@ describe('end to end tests', () => {
           // the package activation is finished when it really isn't. Set a timeout
           // for the time being to allow the package to finish its work before
           // testing expectations.
-          waits(2500);
+          waits(1000);
         });
       });
 
@@ -153,7 +153,7 @@ describe('end to end tests', () => {
 
         // Untoggle the variational-editor command.
         atom.commands.dispatch(workspaceElement, 'variational-editor:toggle');
-        waits(2500);
+        waits(1000);
 
         // Check the decoration markers are no longer present on the editor.
         // Unlock these tests while refactoring the teardown process.

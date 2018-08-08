@@ -91,14 +91,8 @@ class VariationalEditor {
     // initialize the user interface
     // TODO: make this a function that returns an object conforming to VariationalEditor
     createUI() {
-        var mainUIElement = $(`<div id='${enclosingDivId}'><div id='${mainDivId}'></div>
-                           <div id='${secondaryDivId}' class='veditor-secondary'>
-                             <a href='' id='addNewDimension'><img id='addNewDimensionImg' border="0" src="${iconsPath}/add_square_button.png" width="30" height="30"/> </a>
-                           </div></div>`);
-        this.ui.panel = atom.workspace.addRightPanel({ item: mainUIElement });
+        this.ui.panel = atom.workspace.addRightPanel({ item: this.ui.sidePanel });
         this.ui.panel.hide();
-        this.ui.main = mainUIElement.find(`#${mainDivId}`);
-        this.ui.secondary = mainUIElement.find(`#${secondaryDivId}`);
         this.ui.message = this.ui.main.find("#message");
         this.ui.markers = [];
 
@@ -330,28 +324,11 @@ class VariationalEditor {
                 }
             }
             // default the selection to 'BOTH' if none has been made
-            if (!previousSelection) this.ui.activeChoices.push({ name: dimensionName, status: 'BOTH' });
+            if (!previousSelection) {
+                this.ui.activeChoices.push({ name: dimensionName, status: 'BOTH' });
+            }
 
-            var dimDiv = $(`<div class='form-group dimension-ui-div' id='${dimensionName}'>
-  <input class='colorpicker' type='text' id="${dimensionName}-colorpicker">
-  <h2>${dimensionName}</h2>
-  <br>
-  <div class="switch-toggle switch-3 switch-candy">
-
-    <input id="${dimensionName}-view-both" name="state-${dimensionName}" type="radio" ${this.ui.shouldBeChecked('BOTH', dimensionName)} >
-    <label for="${dimensionName}-view-both">BOTH</label>
-    <br>
-    <input id="${dimensionName}-view-thenbranch" name="state-${dimensionName}" type="radio" ${this.ui.shouldBeChecked('DEF', dimensionName)} >
-    <label for="${dimensionName}-view-thenbranch">DEF</label>
-    <br>
-    <input id="${dimensionName}-view-elsebranch" name="state-${dimensionName}" type="radio" ${this.ui.shouldBeChecked('NDEF', dimensionName)} >
-    <label for="${dimensionName}-view-elsebranch">NDEF</label>
-
-  </div>
-  <a href='' id='removeDimension-${dimensionName}' class='delete_icon'><img name='removeDimensionImg' border="0" src="${iconsPath}/delete-bin.png" width="16" height="18"/></a>
-  <br>
-</div>`);
-            this.ui.main.append(dimDiv);
+            this.ui.createColorPicker(dimensionName);
 
             //only hook up listeners, etc. once!
             $('#removeDimension-' + dimensionName).on("click", () => {
@@ -634,7 +611,8 @@ class VariationalEditor {
     }
 
     activate(state) {
-        this.state = "unparsed"
+        console.log(state);
+        this.state = "unparsed";
         this.ui = new VariationalEditorView(state);
 
         this.nesting = [];

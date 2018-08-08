@@ -1,6 +1,7 @@
 'use babel';
-import { DisplayMarker, Panel } from 'atom'
+import { DisplayMarker, Disposable, Panel } from 'atom'
 import $ from 'jquery'
+import path from 'path';
 
 import { ChoiceNode } from './ast'
 
@@ -11,13 +12,15 @@ export class NestLevel {
 
 export type DimensionStatus = "DEF" | "NDEF" | "BOTH"
 
+export interface DimensionUI {
+    name: string;
+    color: string;
+    colorpicker?: JQuery;
+}
+
 export class Selector {
     name: string
     status: DimensionStatus
-}
-
-export interface Disposable {
-    dispose(): any
 }
 
 export interface MenuItem {
@@ -28,19 +31,22 @@ export interface MenuItem {
 
 export type Branch = "thenbranch" | "elsebranch";
 
+var iconsPath = path.resolve(atom.packages.resolvePackagePath("variational-editor-atom"),
+    "icons");
+
 export class VariationalEditorView {
-    panel: Panel;
-    session: DimensionUI[];
+    activeChoices: Selector[];
+    contextMenu: Disposable;
     dimensions: DimensionUI[];
     main: JQuery;
-    secondary: JQuery;
-    message: JQuery;
-    activeChoices: Selector[];
     markers: DisplayMarker[];
-    regionMarkers: DisplayMarker[];
-    contextMenu: Disposable;
     menuItems: MenuItem[]
-
+    message: JQuery;
+    panel: Panel;
+    secondary: JQuery;
+    session: DimensionUI[];
+    sidePanel: JQuery;
+    regionMarkers: DisplayMarker[];
 
     constructor({ panel = null, session = [], dimensions = [], activeChoices = [], markers = [] }) {
         this.panel = panel;
@@ -48,6 +54,18 @@ export class VariationalEditorView {
         this.dimensions = dimensions; //TODO do we really need a session and a list of dimensions? are they the same?
         this.activeChoices = activeChoices;
         this.markers = markers;
+        this.sidePanel = $('<div></div>');
+        // this.main holds the spectrum colorpickers.
+        this.main = $('<div id="variationalEditorUI"></div>');
+        this.sidePanel.append(this.main);
+
+        // this.secondary holds the buttons.
+        this.secondary = $(`<div id="variationalEditorUIButtons" class="veditor-secondary">
+  <a href='' id='addNewDimension'>
+    <img id='addNewDimensionImg' border="0" src="${iconsPath}/add_square_button.png" width="30" height="30">
+  </a>
+</div>`);
+        this.sidePanel.append(this.secondary);
     }
 
     serialize() {
@@ -57,6 +75,26 @@ export class VariationalEditorView {
                 activeChoices: this.activeChoices, markers: this.markers
             }, deserializer: "VariationalEditorView"
         };
+    }
+
+    createColorPicker(name: string) {
+        this.main.append($(`<div class='form-group dimension-ui-div' id='${name}'>
+  <input class='colorpicker' type='text' id="${name}-colorpicker">
+  <h2>${name}</h2>
+  <br>
+  <div class="switch-toggle switch-3 switch-candy">
+    <input id="${name}-view-both" name="state-${name}" type="radio" ${this.shouldBeChecked('BOTH', name)}>
+    <label for="${name}-view-both">BOTH</label>
+    <br>
+    <input id="${name}-view-thenbranch" name="state-${name}" type="radio" ${this.shouldBeChecked('DEF', name)}>
+    <label for="${name}-view-thenbranch">DEF</label>
+    <br>
+    <input id="${name}-view-elsebranch" name="state-${name}" type="radio" ${this.shouldBeChecked('NDEF', name)}>
+    <label for="${name}-view-elsebranch">NDEF</label>
+  </div>
+  <a href='' id='removeDimension-${name}' class='delete_icon'><img name='removeDimensionImg' border="0" src="${iconsPath}/delete-bin.png" width="16" height="18"></a>
+  <br>
+</div>`));
     }
 
     hasDimension(name: string): boolean {
@@ -163,10 +201,4 @@ export class VariationalEditorView {
             return (!selector || selector.status === dimStatus) ? 'checked' : ''
         }
     }
-}
-
-export interface DimensionUI {
-    name: string;
-    color: string;
-    colorpicker?: JQuery;
 }
