@@ -4,7 +4,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as temp from 'temp';
 
-import { exampleFile, exampleTempFile } from './example';
+import { variationalEditor } from '../lib/variational-editor';
+
+import { exampleFile } from './example';
 import { sidePanelHTML } from './sidePanelHTML';
 
 temp.track();  // Allows temp package to clean up temp files/directories after exit.
@@ -17,8 +19,8 @@ temp.track();  // Allows temp package to clean up temp files/directories after e
 // 
 
 describe('end to end tests', () => {
-  let activationPromise, filePath, filePathVEditor, workspaceElement;
-  const fileName = 'example.c', fileNameVEditor = 'example-temp-veditor.c';
+  let activationPromise, filePath, workspaceElement;
+  const fileName = 'example.c';
 
   // Set up editor with example file for tests.
   beforeEach(() => {
@@ -27,7 +29,6 @@ describe('end to end tests', () => {
     workspaceElement = atom.views.getView(atom.workspace);  // HTMLElement view.
 
     filePath = path.join(directory, fileName);  // Temp file to work on.
-    filePathVEditor = path.join(directory, fileNameVEditor);
     fs.writeFileSync(filePath, exampleFile);
 
     waitsForPromise(() => {
@@ -42,48 +43,9 @@ describe('end to end tests', () => {
     temp.cleanupSync();  // Clean the temp directory.
   });
 
-  // The tests in this block provide basic sanity checks.
-  describe('sanity tests', () => {
-    it ('ensures the active editor is the proper file', () => {
-      const editor = atom.workspace.getActiveTextEditor();
-      expect(editor.getTitle()).toBe(fileName);
-      expect(editor.getText()).toBe(exampleFile);
-    });
-
-    it ('ensures the new file is created when variational-editor is toggled', () => {
-      // This is an activation event, triggering it will cause the package to be
-      // activated.
-      atom.commands.dispatch(workspaceElement, 'variational-editor:toggle');
-
-      waitsForPromise(() => {
-        return activationPromise.then(() => {
-          // The parseVariation method called when the package is toggled on spawns
-          // a process and calls a callback. The method returns before the process
-          // and callback finish executing causing the activationPromise to think
-          // the package activation is finished when it really isn't. Set a timeout
-          // for the time being to allow the package to finish its work before
-          // testing expectations.
-          waits(1000);
-        });
-      });
-
-      runs(() => {
-        const editor = atom.workspace.getActiveTextEditor();
-        expect(fs.existsSync(filePathVEditor)).toBe(true);
-        expect(editor.getTitle()).toBe(fileNameVEditor);
-        expect(editor.getText()).toBe(exampleTempFile);
-
-        // Untoggle the variational-editor command.
-        atom.commands.dispatch(workspaceElement, 'variational-editor:toggle');
-        waits(1000);
-
-        expect(fs.existsSync(filePathVEditor)).toBe(false);
-      });
-    });
-  });
-
   describe('when the variational-editor:toggle event is triggered', () => {
     it('shows and hides the side panel', () => {
+      
       // Before the activation event the view is not on the DOM, and no panel
       // has been created
       expect(atom.workspace.getRightPanels().length).toBe(0);
@@ -105,26 +67,24 @@ describe('end to end tests', () => {
       });
 
       runs(() => {
-        // A side bar should be created with the color picker(s).
-        const sidePanels = atom.workspace.getRightPanels();
-        expect(sidePanels.length).toBe(1);
+        const sidePanel = atom.workspace.getRightPanels()[0];
 
-        // Compare the HTML. For the time being this is a "catch-all" test, but
-        // as the package is refactored, this test should be split into more
-        // granular tests of the html.
-        const sidePanel = sidePanels[0].item[0];
-        expect(sidePanel.outerHTML).toBe(sidePanelHTML);
+        // Ensure the side panel item is the variational editor side panel.
+        expect(sidePanel.item.attr('id')).toBe('variationalEditorSidePanel');
+
+        // The side panel should be visible.
+        expect(sidePanel.isVisible()).toBe(true);
 
         // Untoggle the variational-editor command.
         atom.commands.dispatch(workspaceElement, 'variational-editor:toggle');
         waits(1000);
 
         // The side panel should be gone.
-        expect(atom.workspace.getRightPanels().length).toBe(0);
+        expect(sidePanel.isVisible()).toBe(false);
       });
     });
 
-    it('shows and hides the temporary file', () => {
+    it('shows and hides the color markers in the file', () => {
       // This is an activation event, triggering it will cause the package to be
       // activated.
       atom.commands.dispatch(workspaceElement, 'variational-editor:toggle');
@@ -143,27 +103,165 @@ describe('end to end tests', () => {
 
       runs(() => {
         // Check the decoration markers are present on the editor.
+        // spans contains the start and end rows for the given dimension
+        // branch.
+        const expectedDecorations = {
+          'dimension-marker-DEC-defbranch': {
+            length: 2,
+            spans: [[4, 4], [24, 24]]
+          },
+          'dimension-marker-DEC-ndefbranch': {
+            length: 1,
+            spans: [[6, 6]]
+          },
+          'dimension-marker-MULT-defbranch': {
+            length: 1,
+            spans: [[10, 15]]
+          },
+          'dimension-marker-MULT-ndefbranch': {
+            length: 1,
+            spans: [[17, 17]]
+          },
+          'dimension-marker-BIG-defbranch': {
+            length: 0,
+            spans: []
+          },
+          'dimension-marker-BIG-ndefbranch': {
+            length: 1,
+            spans: [[34, 34]]
+          },
+          'dimension-marker-MULT-defbranch-BIG-defbranch': {
+            length: 1,
+            spans: [[11, 11]]
+          },
+          'dimension-marker-MULT-defbranch-BIG-ndefbranch': {
+            length: 1,
+            spans: [[13, 13]]
+          }
+        }
         let editor = atom.workspace.getActiveTextEditor();
-        expect(editor.getDecorations({class: 'dimension-marker-DEC-defbranch'}).length).toBe(2);
-        expect(editor.getDecorations({class: 'dimension-marker-DEC-ndefbranch'}).length).toBe(1);
-        expect(editor.getDecorations({class: 'dimension-marker-MULT-defbranch'}).length).toBe(1);
-        expect(editor.getDecorations({class: 'dimension-marker-MULT-ndefbranch'}).length).toBe(1);
-        expect(editor.getDecorations({class: 'dimension-marker-BIG-defbranch'}).length).toBe(1);
-        expect(editor.getDecorations({class: 'dimension-marker-BIG-ndefbranch'}).length).toBe(2);
+
+        for (let expectedDecorationName in expectedDecorations) {
+          expectedDecoration = expectedDecorations[expectedDecorationName];
+          decorations = editor.getDecorations({ class: expectedDecorationName });
+
+          // The decoration retreived from the editor should have the same
+          // length as the expected decoration.
+          expect(decorations.length).toBe(expectedDecoration.length);
+
+          for (let decoration of decorations) {
+            const range = decoration.getMarker().getBufferRange();
+            const span = [range.start.row, range.end.row];
+
+            // The span of the decoration should exist in the expected
+            // decoration spans.
+            expect(expectedDecoration.spans).toContain(span);
+          }
+        }
 
         // Untoggle the variational-editor command.
         atom.commands.dispatch(workspaceElement, 'variational-editor:toggle');
         waits(1000);
 
-        // Check the decoration markers are no longer present on the editor.
-        // Unlock these tests while refactoring the teardown process.
-        /* editor = atom.workspace.getActiveTextEditor();
-         * expect(editor.getDecorations({class: 'dimension-marker-DEC-defbranch'}).length).toBe(0);
-         * expect(editor.getDecorations({class: 'dimension-marker-DEC-ndefbranch'}).length).toBe(0);
-         * expect(editor.getDecorations({class: 'dimension-marker-MULT-defbranch'}).length).toBe(0);
-         * expect(editor.getDecorations({class: 'dimension-marker-MULT-ndefbranch'}).length).toBe(0);
-         * expect(editor.getDecorations({class: 'dimension-marker-BIG-defbranch'}).length).toBe(0);
-         * expect(editor.getDecorations({class: 'dimension-marker-BIG-ndefbranch'}).length).toBe(0);*/
+        for (let expectedDecoration in expectedDecorations) {
+          expect(editor.getDecorations({ class: expectedDecorations }).length).toBe(0);
+        }
+      });
+    });
+
+    it('creates the stylesheet for the dimensions', () => {
+      // This is an activation event, triggering it will cause the package to be
+      // activated.
+      atom.commands.dispatch(workspaceElement, 'variational-editor:toggle');
+
+      waitsForPromise(() => {
+        return activationPromise.then(() => {
+          // The parseVariation method called when the package is toggled on spawns
+          // a process and calls a callback. The method returns before the process
+          // and callback finish executing causing the activationPromise to think
+          // the package activation is finished when it really isn't. Set a timeout
+          // for the time being to allow the package to finish its work before
+          // testing expectations.
+          waits(1000);
+        });
+      });
+
+      runs(() => {
+        const expectedStyles = [
+          'atom-text-editor div.dimension-marker-DEC-defbranch.line',
+          'atom-text-editor div.dimension-marker-DEC-defbranch.line.cursor-line',
+          'atom-text-editor div.dimension-marker-DEC-defbranch.line.highlight',
+          'atom-text-editor div.dimension-marker-DEC-defbranch.line.hover-alt',
+          'atom-text-editor div.dimension-marker-DEC-ndefbranch.line',
+          'atom-text-editor div.dimension-marker-DEC-ndefbranch.line.cursor-line',
+          'atom-text-editor div.dimension-marker-DEC-ndefbranch.line.highlight',
+          'atom-text-editor div.dimension-marker-DEC-ndefbranch.line.hover-alt',
+          'atom-text-editor div.dimension-marker-MULT-defbranch.line',
+          'atom-text-editor div.dimension-marker-MULT-defbranch.line.cursor-line',
+          'atom-text-editor div.dimension-marker-MULT-defbranch.line.highlight',
+          'atom-text-editor div.dimension-marker-MULT-defbranch.line.hover-alt',
+          'atom-text-editor div.dimension-marker-MULT-ndefbranch.line',
+          'atom-text-editor div.dimension-marker-MULT-ndefbranch.line.cursor-line',
+          'atom-text-editor div.dimension-marker-MULT-ndefbranch.line.highlight',
+          'atom-text-editor div.dimension-marker-MULT-ndefbranch.line.hover-alt',
+          'atom-text-editor div.dimension-marker-BIG-ndefbranch.line',
+          'atom-text-editor div.dimension-marker-BIG-ndefbranch.line.cursor-line',
+          'atom-text-editor div.dimension-marker-BIG-ndefbranch.line.highlight',
+          'atom-text-editor div.dimension-marker-BIG-ndefbranch.line.hover-alt',
+          'atom-text-editor div.dimension-marker-MULT-defbranch-BIG-defbranch.line',
+          'atom-text-editor div.dimension-marker-MULT-defbranch-BIG-defbranch.line.cursor-line',
+          'atom-text-editor div.dimension-marker-MULT-defbranch-BIG-defbranch.line.highlight',
+          'atom-text-editor div.dimension-marker-MULT-defbranch-BIG-defbranch.line.hover-alt',
+          'atom-text-editor div.dimension-marker-MULT-defbranch-BIG-ndefbranch.line',
+          'atom-text-editor div.dimension-marker-MULT-defbranch-BIG-ndefbranch.line.cursor-line',
+          'atom-text-editor div.dimension-marker-MULT-defbranch-BIG-ndefbranch.line.highlight',
+          'atom-text-editor div.dimension-marker-MULT-defbranch-BIG-ndefbranch.line.hover-alt',
+        ];
+        const stylePath = path.resolve(
+          atom.packages.resolvePackagePath('variational-editor-atom'),
+          'styles',
+          'projects',
+          `${fileName}.css`);
+
+        const styleSheets = atom.styles.getStyleElements().filter(element => {
+          return element.sourcePath === stylePath;
+        });
+
+        expect(styleSheets.length).toBe(1);
+        
+        const styleSheet = styleSheets[0];
+
+        const styles = styleSheet.textContent.trim().split('\n');
+        expect(styles.length).toBe(expectedStyles.length);
+
+        // Remove the rules, leaving just the classes.
+        const styleClasses = styles.map((style) => {
+          return style.split('{')[0].trim();
+        });
+
+        for (let expectedStyle of expectedStyles) {
+          expect(styleClasses).toContain(expectedStyle);
+        }
+
+        // Ensure the list is sorted from least to most dimensions.
+        // Remove the non-dimension classes and split the dimension class on
+        // the hyphens.
+        const dimensionClasses = styleClasses.map((style) => {
+          const dimensionRegex = /.dimension-marker[^.]*/g;
+          const dimensionClass = dimensionRegex.exec(style);
+          return dimensionClass[0].split('-');
+        });
+
+        for (let i = 1; i < dimensionClasses.length; i++) {
+          expect(dimensionClasses[i].length).not.toBeLessThan(dimensionClasses[i-1].length);
+        }
+        
+        // Untoggle the variational-editor command.
+        atom.commands.dispatch(workspaceElement, 'variational-editor:toggle');
+        waits(1000);
+
+        // The styleElement should not exist in atom.styles.
+        expect(atom.styles.styleElements.indexOf(styleSheet)).toBe(-1);
       });
     });
   });

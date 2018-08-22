@@ -53,7 +53,4 @@ export const sidePanelHTML = `<div><div id="variationalEditorUI"><div class="for
   <a href="" id="removeDimension-BIG" class="delete_icon"><img name="removeDimensionImg" border="0" src="${variationalEditorPath}/icons/delete-bin.png" width="16" height="18"></a>
   <br>
 </div></div><div id="variationalEditorUIButtons" class="veditor-secondary">
-  <a href="" id="addNewDimension">
-    <img id="addNewDimensionImg" border="0" src="${variationalEditorPath}/icons/add_square_button.png" width="30" height="30">
-  </a>
 </div></div>`
