@@ -53,6 +53,7 @@ class VariationalEditor {
     activate(state) {
         this.parsed = false;
         this.ui = new VariationalEditorView(state);
+        this.ui.onColorChange(() => this.generateStyleSheet());
         this.sidePanel = atom.workspace.addRightPanel({
             item: this.ui.sidePanel,
             visible: false
@@ -138,8 +139,8 @@ class VariationalEditor {
 
         const thenNode = node.thenbranch;
         const thenRange: Range = new Range(
-            [thenNode.span.start[0] + 1, thenNode.span.start[1]],
-            [thenNode.span.end[0] - 1, thenNode.span.end[1]]);
+            [thenNode.span.start[0] + 1, 0],
+            [thenNode.span.end[0], 0]);
         const thenMarker: DisplayMarker = editor.markBufferRange(thenRange);
 
         this.decorations.addDecoration(thenMarker, node.name, thenBranch);
@@ -147,8 +148,8 @@ class VariationalEditor {
         if (node.elsebranch.segments.length > 0) {
             const elseNode = node.elsebranch;
             const elseRange: Range = new Range(
-                [elseNode.span.start[0] + 1, elseNode.span.start[1]],
-                [elseNode.span.end[0] - 1, elseNode.span.end[1]]);
+                [elseNode.span.start[0] + 1, 0],
+                [elseNode.span.end[0], 0]);
             const elseMarker: DisplayMarker = editor.markBufferRange(elseRange);
 
             let elseBranch: BranchCondition;
@@ -176,21 +177,7 @@ class VariationalEditor {
         }
     }
 
-    addViewListeners(dimension: DimensionUI) {
-        $(`#${dimension.name}-view-both`).on('click', () => {
-            this.unsetDimension(dimension.name);
-        });
-
-        $(`#${dimension.name}-view-elsebranch`).on('click', () => {
-            this.setDimensionUndefined(dimension.name);
-        });
-
-        $(`#${dimension.name}-view-thenbranch`).on('click', () => {
-            this.setDimensionDefined(dimension.name);
-        });
-    }
-
-    generateStyleSheet() {
+    generateStyleSheet(): void {
         const decorationQueue: DecorationInfo[] = this.decorations.getAllDecorationInfo();
         const stylesCache: { [key: string]: string } = {};
         let css: string = '';
@@ -205,19 +192,16 @@ class VariationalEditor {
 
             const dimensionColor: string = this.ui.getDimensionColor(decorationInfo.dimension);
 
-            let branchcolor: string, branchcursorcolor: string,
-                branchhighlightcolor: string, branchhovercolor: string;
+            let branchcolor: string, branchcursorcolor: string, branchhovercolor: string;
             if (decorationInfo.branchCondition === defbranch) {
                 branchcolor = this.shadeColor(dimensionColor, .1);
                 branchcursorcolor = this.shadeColor(dimensionColor, .2);
-                branchhighlightcolor = this.shadeColor(dimensionColor, .3);
-                branchhovercolor = branchhighlightcolor;
+                branchhovercolor = this.shadeColor(dimensionColor, .3);
             }
             else {
                 branchcolor = this.shadeColor(dimensionColor, -.3);
                 branchcursorcolor = this.shadeColor(dimensionColor, -.2);
-                branchhighlightcolor = this.shadeColor(dimensionColor, -.1);
-                branchhovercolor = branchhighlightcolor;
+                branchhovercolor = this.shadeColor(dimensionColor, -.1);
             }
 
             let branchstyle: string, branchcursorstyle: string,
@@ -235,19 +219,16 @@ class VariationalEditor {
 
                 branchstyle = `${parentStyle}, ${branchcolor} ${styleGradient}%`;
                 branchcursorstyle = `${parentStyle}, ${branchcursorcolor} ${styleGradient}%`;
-                branchhighlightstyle = `${parentStyle}, ${branchhighlightcolor} ${styleGradient}%`;
                 branchhoverstyle = `${parentStyle}, ${branchhovercolor} ${styleGradient}%`;
 
-                css += `atom-text-editor div.${decorationInfo.className}.line { background-color: linear-gradient(90deg, ${branchstyle}) }\n`;
-                css += `atom-text-editor div.${decorationInfo.className}.line.cursor-line { background-color: linear-gradient(90deg, ${branchcursorstyle}) }\n`;
-                css += `atom-text-editor div.${decorationInfo.className}.line.highlight { background-color: linear-gradient(90deg, ${branchhighlightstyle}) }\n`;
-                css += `atom-text-editor div.${decorationInfo.className}.line.hover-alt { background-color: linear-gradient(90deg, ${branchhoverstyle}) }\n`;
+                css += `atom-text-editor div.${decorationInfo.className}.line { background: linear-gradient(90deg, ${branchstyle}) }\n`;
+                css += `atom-text-editor div.${decorationInfo.className}.line.cursor-line { background: linear-gradient(90deg, ${branchcursorstyle}) }\n`;
+                css += `atom-text-editor div.${decorationInfo.className}.line.hover-alt { background: linear-gradient(90deg, ${branchhoverstyle}) }\n`;
             }
             else {
                 // No parentClass so the background-color should be a solid color.
                 css += `atom-text-editor div.${decorationInfo.className}.line { background-color: ${branchcolor} }\n`;
                 css += `atom-text-editor div.${decorationInfo.className}.line.cursor-line { background-color: ${branchcursorcolor} }\n`;
-                css += `atom-text-editor div.${decorationInfo.className}.line.highlight { background-color: ${branchhighlightcolor} }\n`;
                 css += `atom-text-editor div.${decorationInfo.className}.line.hover-alt { background-color: 90deg, ${branchhovercolor} }\n`;
 
                 branchstyle = `${branchcolor} 0%`; // For use by child classes that require linear-gradient.
@@ -269,7 +250,7 @@ class VariationalEditor {
         lum = lum || 0;
         lum = lum + 1;
 
-        // The regex matches on 'rgb(x, y , z)' and returns a pair
+        // The regex matches on 'rgb(x, y, z)' and returns a pair
         // ['rgb(x, y, z)', 'x, y, z']
         const rgbMatch: string[] = rgb.match(/rgb\(([^)]*)\)/);
         const rgbValues: string[] = rgbMatch[1].split(',');
@@ -277,67 +258,6 @@ class VariationalEditor {
         // convert to decimal and change luminosity
         return `rgba(${Math.floor(parseInt(rgbValues[0], 10) * lum)}, ${Math.floor(parseInt(rgbValues[1], 10) * lum)}, ${Math.floor(parseInt(rgbValues[2], 10) * lum)}, .3)`;
     }
-
-    removeDimension(dimName: string) {
-        var sure = confirm('Are you sure you want to remove this dimension? Any currently \
-              visible code in this dimension will be promoted. Any hidden code will be removed.')
-
-        if (sure) {
-            //find the dimension and remove it
-            const dimension = this.ui.panelMenus[dimName];
-            delete this.ui.panelMenus[dimName];
-            dimension.colorpicker.remove();
-            // for (var i = 0; i < this.ui.dimensions.length; i++) {
-            //     if (this.ui.dimensions[i].name === dimName) {
-            //         this.ui.dimensions.splice(i, 1);
-            //         $("#" + dimName).remove();
-            //     }
-            // }
-            // var selection: Selector = getSelectionForDim(dimName, this.ui.activeChoices);
-            // this.deleteDimension(selection);
-            // this.updateEditorText();
-        }
-    }
-
-    setDimension(dimName: string, status: DimensionStatus) {
-        for (var i = 0; i < this.ui.activeChoices.length; i++) {
-            if (this.ui.activeChoices[i].name === dimName) {
-                this.ui.activeChoices[i].status = status;
-            }
-        }
-    }
-
-    // show the thenbranch alternative
-    setDimensionDefined(dimName: string) {
-        this.setDimension(dimName, 'DEF');
-    }
-
-    // show the elsebranch alternative
-    setDimensionUndefined(dimName: string) {
-        this.setDimension(dimName, 'NDEF');
-    }
-
-    // hide the elsebranch alternative
-    unsetDimension(dimName: string) {
-        this.setDimension(dimName, 'BOTH');
-    }
-
-    // Currently `event` isn't used, but it's required because the event
-    // listener passes an event to this function. For now ignore any typescript
-    // warnings about its value never being read.
-    // KeyDownCheck(event) {
-    //     if (this.parsed === "parsed") {
-    //         //make note of the last cursor position so we can use it on keyup
-    //         var activeEditor = atom.workspace.getActiveTextEditor();
-    //         var location = activeEditor.getCursorBufferPosition();
-    //         this.lastCursorLocation = location;
-    //     }
-    // }
-
-    // noUndoForYou() {
-    //     if (this.parsed === "parsed") return;
-    //     atom.commands.dispatch(atom.views.getView(atom.workspace.getActiveTextEditor()), "core:undo");
-    // }
 };
 
 export default new VariationalEditor();

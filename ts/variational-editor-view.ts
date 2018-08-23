@@ -64,6 +64,7 @@ export class VariationalEditorView {
     menuItems: MenuItem[]
     message: JQuery;
     nesting: NestLevel[];
+    onColorChangeCb: () => any;
     panel: Panel;
     secondary: JQuery;
     session: DimensionUI[];
@@ -169,13 +170,13 @@ export class VariationalEditorView {
   <h2>${name}</h2>
   <br>
   <div class="switch-toggle switch-3 switch-candy">
-    <input id="${name}-view-both" name="state-${name}" type="radio" ${this.shouldBeChecked('BOTH', name)}>
+    <input id="${name}-view-both" name="state-${name}" type="radio" checked>
     <label for="${name}-view-both">BOTH</label>
     <br>
-    <input id="${name}-view-thenbranch" name="state-${name}" type="radio" ${this.shouldBeChecked('DEF', name)}>
+    <input id="${name}-view-thenbranch" name="state-${name}" type="radio" >
     <label for="${name}-view-thenbranch">DEF</label>
     <br>
-    <input id="${name}-view-elsebranch" name="state-${name}" type="radio" ${this.shouldBeChecked('NDEF', name)}>
+    <input id="${name}-view-elsebranch" name="state-${name}" type="radio" >
     <label for="${name}-view-elsebranch">NDEF</label>
   </div>
   <a href='' id='removeDimension-${name}' class='delete_icon'><img name='removeDimensionImg' border="0" src="${iconsPath}/delete-bin.png" width="16" height="18"></a>
@@ -191,6 +192,7 @@ export class VariationalEditorView {
                 preferredFormat: 'rgb'
             }).on('change', () => {
                 panelMenu.color = panelMenu.colorpicker.spectrum('get').toRgbString();
+                this.onColorChangeCb();
             });
             this.main.append(element);
         }
@@ -220,24 +222,6 @@ export class VariationalEditorView {
         return this.panelMenus.hasOwnProperty(name);
     }
 
-    sessionColorFor(name: string): string {
-        for (let dim of this.session) {
-            if (dim.name === name) return dim.color;
-        }
-        return 'none';
-    }
-
-    updateSession(dimension: DimensionUI) {
-        for (let i = 0; i < this.session.length; i++) {
-            const dim = this.session[i];
-            if (dim.name === dimension.name) {
-                this.session[i] = dimension
-                return;
-            }
-        }
-        this.session.push(dimension);
-    }
-
     getDimensionColor(name: string): string {
         if (!this.hasPanelMenu(name)) {
             throw new Error(`Dimension ${name} doesn't exist; cannot get color`);
@@ -245,21 +229,7 @@ export class VariationalEditorView {
         return this.panelMenus[name].color;
     }
 
-    getSelector(dimName: string): Selector {
-        for (const choice of this.activeChoices) {
-            if (choice.name === dimName) return choice;
-        }
-        return null;
-    }
-
-    shouldBeChecked(dimStatus: DimensionStatus, dimName: string): string {
-        const selector = this.getSelector(dimName);
-        if (dimStatus === 'DEF') {
-            return (selector && selector.status === dimStatus) ? 'checked' : ''
-        } else if (dimStatus === 'NDEF') {
-            return (selector && selector.status === dimStatus) ? 'checked' : ''
-        } else if (dimStatus === 'BOTH') {
-            return (!selector || selector.status === dimStatus) ? 'checked' : ''
-        }
+    onColorChange(cb: () => any): void {
+        this.onColorChangeCb = cb;
     }
 }

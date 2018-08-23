@@ -108,19 +108,19 @@ describe('end to end tests', () => {
         const expectedDecorations = {
           'dimension-marker-DEC-defbranch': {
             length: 2,
-            spans: [[4, 4], [24, 24]]
+            spans: [[4, 5], [24, 25]]
           },
           'dimension-marker-DEC-ndefbranch': {
             length: 1,
-            spans: [[6, 6]]
+            spans: [[6, 7]]
           },
           'dimension-marker-MULT-defbranch': {
             length: 1,
-            spans: [[10, 15]]
+            spans: [[10, 16]]
           },
           'dimension-marker-MULT-ndefbranch': {
             length: 1,
-            spans: [[17, 17]]
+            spans: [[17, 18]]
           },
           'dimension-marker-BIG-defbranch': {
             length: 0,
@@ -128,15 +128,15 @@ describe('end to end tests', () => {
           },
           'dimension-marker-BIG-ndefbranch': {
             length: 1,
-            spans: [[34, 34]]
+            spans: [[34, 35]]
           },
           'dimension-marker-MULT-defbranch-BIG-defbranch': {
             length: 1,
-            spans: [[11, 11]]
+            spans: [[11, 12]]
           },
           'dimension-marker-MULT-defbranch-BIG-ndefbranch': {
             length: 1,
-            spans: [[13, 13]]
+            spans: [[13, 14]]
           }
         }
         let editor = atom.workspace.getActiveTextEditor();
@@ -190,31 +190,24 @@ describe('end to end tests', () => {
         const expectedStyles = [
           'atom-text-editor div.dimension-marker-DEC-defbranch.line',
           'atom-text-editor div.dimension-marker-DEC-defbranch.line.cursor-line',
-          'atom-text-editor div.dimension-marker-DEC-defbranch.line.highlight',
           'atom-text-editor div.dimension-marker-DEC-defbranch.line.hover-alt',
           'atom-text-editor div.dimension-marker-DEC-ndefbranch.line',
           'atom-text-editor div.dimension-marker-DEC-ndefbranch.line.cursor-line',
-          'atom-text-editor div.dimension-marker-DEC-ndefbranch.line.highlight',
           'atom-text-editor div.dimension-marker-DEC-ndefbranch.line.hover-alt',
           'atom-text-editor div.dimension-marker-MULT-defbranch.line',
           'atom-text-editor div.dimension-marker-MULT-defbranch.line.cursor-line',
-          'atom-text-editor div.dimension-marker-MULT-defbranch.line.highlight',
           'atom-text-editor div.dimension-marker-MULT-defbranch.line.hover-alt',
           'atom-text-editor div.dimension-marker-MULT-ndefbranch.line',
           'atom-text-editor div.dimension-marker-MULT-ndefbranch.line.cursor-line',
-          'atom-text-editor div.dimension-marker-MULT-ndefbranch.line.highlight',
           'atom-text-editor div.dimension-marker-MULT-ndefbranch.line.hover-alt',
           'atom-text-editor div.dimension-marker-BIG-ndefbranch.line',
           'atom-text-editor div.dimension-marker-BIG-ndefbranch.line.cursor-line',
-          'atom-text-editor div.dimension-marker-BIG-ndefbranch.line.highlight',
           'atom-text-editor div.dimension-marker-BIG-ndefbranch.line.hover-alt',
           'atom-text-editor div.dimension-marker-MULT-defbranch-BIG-defbranch.line',
           'atom-text-editor div.dimension-marker-MULT-defbranch-BIG-defbranch.line.cursor-line',
-          'atom-text-editor div.dimension-marker-MULT-defbranch-BIG-defbranch.line.highlight',
           'atom-text-editor div.dimension-marker-MULT-defbranch-BIG-defbranch.line.hover-alt',
           'atom-text-editor div.dimension-marker-MULT-defbranch-BIG-ndefbranch.line',
           'atom-text-editor div.dimension-marker-MULT-defbranch-BIG-ndefbranch.line.cursor-line',
-          'atom-text-editor div.dimension-marker-MULT-defbranch-BIG-ndefbranch.line.highlight',
           'atom-text-editor div.dimension-marker-MULT-defbranch-BIG-ndefbranch.line.hover-alt',
         ];
         const stylePath = path.resolve(
