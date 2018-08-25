@@ -58,6 +58,10 @@ class VariationalEditor {
     }
 
     deactivate() {
+        this.decorations.destroy();
+        this.sidePanel.destroy();
+        this.subscriptions.dispose();
+        this.ui.destroy();
     }
 
     serialize() {
