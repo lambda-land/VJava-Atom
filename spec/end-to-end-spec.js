@@ -16,8 +16,6 @@ temp.track();  // Allows temp package to clean up temp files/directories after e
 // To run a specific `it` or `describe` block add an `f` to the front (e.g. `fit`
 // or `fdescribe`). Remove the `f` to unfocus the block.
 
-// 
-
 describe('end to end tests', () => {
   let activationPromise, filePath, workspaceElement;
   const fileName = 'example.c';

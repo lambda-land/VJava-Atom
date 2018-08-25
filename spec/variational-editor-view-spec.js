@@ -89,13 +89,4 @@ describe('VariationalEditorView', () =>{
       expect(panelMenu.element[0].outerHTML).toBe(colorPickerHTML);
     });
   });
-
-  describe('when dimensions are added', () => {
-    it('creates side panels for each dimension', () => {
-      variationalEditorView.createPanelMenuItems(dimensions);
-      expect(variationalEditorView.hasPanelMenu(name1)).toBe(true);
-      expect(variationalEditorView.hasPanelMenu(name2)).toBe(true);
-      expect(variationalEditorView.hasPanelMenu(name3)).toBe(false);
-    });
-  });
 });

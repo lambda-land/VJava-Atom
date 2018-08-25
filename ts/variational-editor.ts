@@ -10,7 +10,6 @@ import {
     TextEditor
 } from 'atom';
 import { spawn } from 'child_process';
-import $ from 'jquery';
 import path from 'path';
 
 import { ChoiceNode, RegionNode, SegmentNode } from './ast';
@@ -22,33 +21,25 @@ import {
     ndefbranch
 } from './dimension-decoration-manager';
 import {
-    DimensionStatus,
-    DimensionUI,
-    NestLevel,
-    Selector,
     VariationalEditorView
 } from './variational-editor-view';
 
+// Extend atom interfaces.
+declare module 'atom' {
+    export interface StyleManager {
+        // This method is not documented in Atom's public API. This method
+        // can be found in `src/style-manager.js` in Atom's GitHub.
+        addStyleSheet(source: string, params?: any): Disposable;
+    }
+}
 
 class VariationalEditor {
-    decorations: DimensionDecorationManager
-    nesting: NestLevel[]
-    sidePanel: Panel
-    stylesheet: Disposable
-    ui: VariationalEditorView
-    doc: RegionNode
-    raw: string
-    addChoiceLockout: boolean = false
-    lastCursorLocation: TextBuffer.Point
-    lastShowDoc: RegionNode
-    popupListenerQueue: { element: HTMLElement, text: string }[]
-    colorpicker: {}
-    dimensionColors: {}
-    activeChoices: Selector[] // in the form of dimensionId:thenbranch|elsebranch
-    subscriptions: CompositeDisposable
-    saveSubscription: Disposable
-    tooltips: CompositeDisposable
-    parsed: boolean
+    decorations: DimensionDecorationManager;
+    parsed: boolean;
+    sidePanel: Panel;
+    stylesheet: Disposable;
+    subscriptions: CompositeDisposable;
+    ui: VariationalEditorView;
 
     activate(state) {
         this.parsed = false;
@@ -64,16 +55,13 @@ class VariationalEditor {
         this.subscriptions.add(atom.commands.add('atom-workspace', {
             'variational-editor:toggle': () => this.toggle()
         }));
-
-        // this.subscriptions.add(atom.commands.add('atom-workspace', {
-        //     'variational-editor:undo': () => this.noUndoForYou()
-        // }));
     }
 
     deactivate() {
     }
 
     serialize() {
+        return this.ui.serialize();
     }
 
     toggle() {
@@ -111,8 +99,7 @@ class VariationalEditor {
             const dimensions = JSON.parse(data);
 
             if (dimensions.type === 'region') {
-                this.ui.createPanelMenuItems(dimensions);
-                this.addDecorations(dimensions);
+                this.addDimensions(dimensions);
                 this.generateStyleSheet(); // TODO: Generate CSS based on decoration marker tree.
             }
             else {
@@ -164,15 +151,16 @@ class VariationalEditor {
         }
     }
 
-    addDecorations(node: SegmentNode | RegionNode) {
+    addDimensions(node: SegmentNode | RegionNode) {
         if (node.type === 'choice') {
+            this.ui.createPanelMenu(node.name);
             this.addDecoration(node);
-            this.addDecorations(node.thenbranch);
-            this.addDecorations(node.elsebranch);
+            this.addDimensions(node.thenbranch);
+            this.addDimensions(node.elsebranch);
         }
         else if (node.type === 'region') {
             for (let segment of node.segments) {
-                this.addDecorations(segment);
+                this.addDimensions(segment);
             }
         }
     }
@@ -204,8 +192,7 @@ class VariationalEditor {
                 branchhovercolor = this.shadeColor(dimensionColor, -.1);
             }
 
-            let branchstyle: string, branchcursorstyle: string,
-                branchhighlightstyle: string, branchhoverstyle: string;
+            let branchstyle: string, branchcursorstyle: string, branchhoverstyle: string;
 
             if (stylesCache.hasOwnProperty(decorationInfo.parentClassName)) {
                 // The background color for a line in a dimension uses the css

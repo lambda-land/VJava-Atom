@@ -1,24 +1,7 @@
 'use babel';
-import { DisplayMarker, Disposable, Panel, Range, TextEditor } from 'atom'
-import $ from 'jquery'
+import $ from 'jquery';
 import path from 'path';
 
-import { ChoiceNode, RegionNode, SegmentNode } from './ast'
-
-
-// Extend atom interfaces.
-declare module 'atom' {
-    export interface StyleManager {
-        // This method is not documented in Atom's public API. This method
-        // can be found in `src/style-manager.js` in Atom's GitHub.
-        addStyleSheet(source: string, params?: any): Disposable;
-    }
-}
-
-export class NestLevel {
-    selector: Selector
-    dimension: ChoiceNode
-}
 
 export type DimensionStatus = "DEF" | "NDEF" | "BOTH"
 
@@ -29,17 +12,6 @@ export interface DimensionUI {
     element: JQuery;
 }
 
-export class Selector {
-    name: string
-    status: DimensionStatus
-}
-
-export interface MenuItem {
-    label: string
-    submenu?: MenuItem[]
-    command?: string
-}
-
 export type Branch = "thenbranch" | "elsebranch";
 
 const iconsPath = path.resolve(
@@ -47,38 +19,14 @@ const iconsPath = path.resolve(
     "icons"
 );
 
-function getdefbranchCssClass(dimName: string): string {
-    return 'dimension-marker-' + dimName + "-defbranch";
-}
-
-function getndefbranchCssClass(dimName: string): string {
-    return 'dimension-marker-' + dimName + "-ndefbranch";
-}
-
 export class VariationalEditorView {
-    activeChoices: Selector[];
-    contextMenu: Disposable;
-    panelMenus: { [dimension: string]: DimensionUI };
     main: JQuery;
-    markers: DisplayMarker[];
-    menuItems: MenuItem[]
-    message: JQuery;
-    nesting: NestLevel[];
     onColorChangeCb: () => any;
-    panel: Panel;
+    panelMenus: { [dimension: string]: DimensionUI };
     secondary: JQuery;
-    session: DimensionUI[];
     sidePanel: JQuery;
-    styles: { [selector: string]: string } = {}
-    regionMarkers: DisplayMarker[];
 
-    constructor({ panel = null, session = [], dimensions = {}, activeChoices = [], markers = [] }) {
-        this.panel = panel;
-        this.session = session;
-        this.panelMenus = dimensions; //TODO do we really need a session and a list of dimensions? are they the same?
-        this.activeChoices = activeChoices;
-        this.markers = markers;
-        this.nesting = [];
+    constructor(state = {}) {
         this.sidePanel = $('<div id="variationalEditorSidePanel"></div>');
         // this.main holds the spectrum colorpickers.
         this.main = $('<div id="variationalEditorUI"></div>');
@@ -88,79 +36,33 @@ export class VariationalEditorView {
         this.secondary = $(`<div id="variationalEditorUIButtons" class="veditor-secondary">
 </div>`);
         this.sidePanel.append(this.secondary);
+
+        this.panelMenus = {};
+
+        for (let dimension in state) {
+            this.createPanelMenu(dimension, state[dimension]);
+        }
     }
 
     serialize() {
-        return {
-            data: {
-                panel: this.panel, session: this.session, dimensions: this.panelMenus,
-                activeChoices: this.activeChoices, markers: this.markers
-            }, deserializer: "VariationalEditorView"
-        };
+        const colors: { [dimension: string]: string } = {};
+        for (let dimension in this.panelMenus) {
+            const menu = this.panelMenus[dimension];
+            colors[menu.name] = menu.color;
+        }
+        return colors;
     }
 
     destroy(): void {
         this.sidePanel.remove();
     }
 
-    addMarker(node: ChoiceNode) {
-        const dimension: DimensionUI = this.getPanelMenu(node.name);
-        const editor: TextEditor = atom.workspace.getActiveTextEditor();
-
-        let thenBranchCssClass: string, elseBranchCssClass: string;
-        if (node.kind === 'positive') {
-            thenBranchCssClass = getdefbranchCssClass(node.name);
-            elseBranchCssClass = getndefbranchCssClass(node.name);
-        }
-        else {
-            thenBranchCssClass = getndefbranchCssClass(node.name);
-            elseBranchCssClass = getdefbranchCssClass(node.name);
-        }
-
-        const elseBranch: boolean = node.elsebranch.segments.length > 0;
-
-        let thenBranchMarker: DisplayMarker, elseBranchMarker: DisplayMarker;
-        if (!elseBranch) {
-            thenBranchMarker = editor.markBufferRange(
-                node.span,
-                { invalidate: 'never' });
-        }
-        else {
-            thenBranchMarker = editor.markBufferRange(
-                node.thenbranch.span,
-                { invalidate: 'never' });
-
-            // Add 1 to the column to account for the #endif statement.
-            const elseRange: Range = new Range(
-                node.elsebranch.span.start,
-                [node.elsebranch.span.end[0] + 1, node.elsebranch.span.end[1]]);
-            elseBranchMarker = editor.markBufferRange(
-                elseRange,
-                { invalidate: 'never' });
-        }
-
-        editor.decorateMarker(
-            thenBranchMarker,
-            {
-                type: 'line',
-                class: thenBranchCssClass
-            });
-
-        if (elseBranch) {
-            editor.decorateMarker(
-                elseBranchMarker,
-                {
-                    type: 'line',
-                    class: elseBranchCssClass
-                });
-        }
-    }
-
-    createPanelMenu(name: string) {
+    createPanelMenu(name: string, color?: string) {
+        const dimensionColor: string = color ? color : 'rgb(127, 71, 62)';
         if (!this.hasPanelMenu(name)) {
             this.panelMenus[name] = {
                 name: name,
-                color: 'rgb(127, 71, 62)',
+                color: dimensionColor,
                 colorpicker: null,
                 element: null
             };
@@ -195,19 +97,6 @@ export class VariationalEditorView {
                 this.onColorChangeCb();
             });
             this.main.append(element);
-        }
-    }
-
-    createPanelMenuItems(node: SegmentNode | RegionNode): void {
-        if (node.type === 'choice') {
-            this.createPanelMenu(node.name);
-            this.createPanelMenuItems(node.thenbranch);
-            this.createPanelMenuItems(node.elsebranch);
-        }
-        else if (node.type === 'region') {
-            for (let segment of node.segments) {
-                this.createPanelMenuItems(segment);
-            }
         }
     }
 
