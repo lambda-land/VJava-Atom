@@ -15,14 +15,12 @@ import path from 'path';
 import { ChoiceNode, RegionNode, SegmentNode } from './ast';
 import {
     BranchCondition,
-    DecorationInfo,
     DimensionDecorationManager,
     defbranch,
     ndefbranch
 } from './dimension-decoration-manager';
-import {
-    VariationalEditorView
-} from './variational-editor-view';
+import { VariationalEditorView } from './variational-editor-view';
+import { Queue, Stack } from './utils';
 
 // Extend atom interfaces.
 declare module 'atom' {
@@ -104,7 +102,7 @@ class VariationalEditor {
 
             if (dimensions.type === 'region') {
                 this.addDimensions(dimensions);
-                this.generateStyleSheet(); // TODO: Generate CSS based on decoration marker tree.
+                this.generateStyleSheet();
             }
             else {
                 throw new TypeError('Expected segments attribute on parsed JSON');
@@ -169,64 +167,86 @@ class VariationalEditor {
         }
     }
 
+    // Create a stylesheet for the dimension colors.
+    // Use exhaustive BFS to generate the styles. This ensures the styles for
+    // more nested dimensions appear later in the style sheet and have higher
+    // specificity than less nested dimensions.
     generateStyleSheet(): void {
-        const decorationQueue: DecorationInfo[] = this.decorations.getAllDecorationInfo();
-        const stylesCache: { [key: string]: string } = {};
+        interface QueueNode {
+            // parentClass is useful for getting the linear gradient of the
+            // parent dimension.
+            parentClass: string,
+            decorationManager: DimensionDecorationManager
+        }
+
+        const decorationQueue: Queue<QueueNode> = new Queue();
+
+        for (let d of this.decorations.getDecorations()) {
+            decorationQueue.push({ parentClass: undefined, decorationManager: d });
+        }
+
+        const linearGradientCache: { [key: string]: string } = {};
         let css: string = '';
 
-        while (decorationQueue.length) {
-            const decorationInfo: DecorationInfo = decorationQueue.shift();
-            decorationQueue.push(...decorationInfo.children);
+        while (!decorationQueue.empty()) {
+            const { parentClass, decorationManager } = decorationQueue.pop();
 
-            if (stylesCache.hasOwnProperty(decorationInfo.className)) {
-                continue;
+            for (let d of decorationManager.children) {
+                decorationQueue.push(
+                    { parentClass: decorationManager.className, decorationManager: d }
+                );
+            };
+
+            if (!linearGradientCache.hasOwnProperty(decorationManager.className)) {
+                const dimensionColor: string = this.ui.getDimensionColor(decorationManager.dimension);
+
+                let branchcolor: string, branchcursorcolor: string, branchhovercolor: string;
+                if (decorationManager.branchCondition === defbranch) {
+                    branchcolor = this.shadeColor(dimensionColor, .1);
+                    branchcursorcolor = this.shadeColor(dimensionColor, .2);
+                    branchhovercolor = this.shadeColor(dimensionColor, .3);
+                }
+                else {
+                    branchcolor = this.shadeColor(dimensionColor, -.3);
+                    branchcursorcolor = this.shadeColor(dimensionColor, -.2);
+                    branchhovercolor = this.shadeColor(dimensionColor, -.1);
+                }
+
+                let branchstyle: string, branchcursorstyle: string, branchhoverstyle: string;
+
+                if (parentClass) {
+                    // The background color for a line in a dimension uses the css
+                    // function linear-gradient. Each nested dimension starts one
+                    // percent higher than the parent dimension.
+                    const parentStyle: string = linearGradientCache[parentClass];
+
+                    // Generate the gradient percent for this dimension from the
+                    // parentStyle's ending percent.
+                    const lastStyleGradientIndex: number = parentStyle.lastIndexOf(' ') + 1;
+                    const styleGradient: number = parseInt(
+                        parentStyle.slice(lastStyleGradientIndex).replace('%', ''),
+                        10) + 1;
+
+                    branchstyle = `${parentStyle}, ${branchcolor} ${styleGradient}%`;
+                    branchcursorstyle = `${parentStyle}, ${branchcursorcolor} ${styleGradient}%`;
+                    branchhoverstyle = `${parentStyle}, ${branchhovercolor} ${styleGradient}%`;
+
+                    css += `atom-text-editor div.${decorationManager.className}.line { background: linear-gradient(90deg, ${branchstyle}) }\n`;
+                    css += `atom-text-editor div.${decorationManager.className}.line.cursor-line { background: linear-gradient(90deg, ${branchcursorstyle}) }\n`;
+                    css += `atom-text-editor div.${decorationManager.className}.line.hover-alt { background: linear-gradient(90deg, ${branchhoverstyle}) }\n`;
+                }
+                else {
+                    // No parentClass so the background-color should be a solid color.
+                    css += `atom-text-editor div.${decorationManager.className}.line { background-color: ${branchcolor} }\n`;
+                    css += `atom-text-editor div.${decorationManager.className}.line.cursor-line { background-color: ${branchcursorcolor} }\n`;
+                    css += `atom-text-editor div.${decorationManager.className}.line.hover-alt { background-color: 90deg, ${branchhovercolor} }\n`;
+
+                    branchstyle = `${branchcolor} 0%`; // For use by child classes that require linear-gradient.
+                }
+
+                // Add branchstyle to stylesCache.
+                linearGradientCache[decorationManager.className] = branchstyle;
             }
-
-            const dimensionColor: string = this.ui.getDimensionColor(decorationInfo.dimension);
-
-            let branchcolor: string, branchcursorcolor: string, branchhovercolor: string;
-            if (decorationInfo.branchCondition === defbranch) {
-                branchcolor = this.shadeColor(dimensionColor, .1);
-                branchcursorcolor = this.shadeColor(dimensionColor, .2);
-                branchhovercolor = this.shadeColor(dimensionColor, .3);
-            }
-            else {
-                branchcolor = this.shadeColor(dimensionColor, -.3);
-                branchcursorcolor = this.shadeColor(dimensionColor, -.2);
-                branchhovercolor = this.shadeColor(dimensionColor, -.1);
-            }
-
-            let branchstyle: string, branchcursorstyle: string, branchhoverstyle: string;
-
-            if (stylesCache.hasOwnProperty(decorationInfo.parentClassName)) {
-                // The background color for a line in a dimension uses the css
-                // function linear-gradient. Each nested dimension starts one
-                // percent higher than the parent dimension.
-                const parentStyle: string = stylesCache[decorationInfo.parentClassName];
-                const lastStyleGradientInd: number = parentStyle.lastIndexOf(' ') + 1;
-                const styleGradient: number = parseInt(
-                    parentStyle.slice(lastStyleGradientInd).replace('%', ''),
-                    10) + 1;
-
-                branchstyle = `${parentStyle}, ${branchcolor} ${styleGradient}%`;
-                branchcursorstyle = `${parentStyle}, ${branchcursorcolor} ${styleGradient}%`;
-                branchhoverstyle = `${parentStyle}, ${branchhovercolor} ${styleGradient}%`;
-
-                css += `atom-text-editor div.${decorationInfo.className}.line { background: linear-gradient(90deg, ${branchstyle}) }\n`;
-                css += `atom-text-editor div.${decorationInfo.className}.line.cursor-line { background: linear-gradient(90deg, ${branchcursorstyle}) }\n`;
-                css += `atom-text-editor div.${decorationInfo.className}.line.hover-alt { background: linear-gradient(90deg, ${branchhoverstyle}) }\n`;
-            }
-            else {
-                // No parentClass so the background-color should be a solid color.
-                css += `atom-text-editor div.${decorationInfo.className}.line { background-color: ${branchcolor} }\n`;
-                css += `atom-text-editor div.${decorationInfo.className}.line.cursor-line { background-color: ${branchcursorcolor} }\n`;
-                css += `atom-text-editor div.${decorationInfo.className}.line.hover-alt { background-color: 90deg, ${branchhovercolor} }\n`;
-
-                branchstyle = `${branchcolor} 0%`; // For use by child classes that require linear-gradient.
-            }
-
-            // Add branchstyle to stylesCache.
-            stylesCache[decorationInfo.className] = branchstyle;
         }
 
         const stylePath = path.resolve(

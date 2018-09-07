@@ -2,24 +2,17 @@
 
 import { Decoration, DisplayMarker, Range, TextEditor } from 'atom';
 
+
 export type BranchCondition = 'defbranch' | 'ndefbranch';
 export const defbranch: BranchCondition = 'defbranch';
 export const ndefbranch: BranchCondition = 'ndefbranch'
-
-export interface DecorationInfo {
-    dimension: string,
-    branchCondition: BranchCondition,
-    className: string,
-    parentClassName?: string,
-    children: DecorationInfo[]
-}
 
 // The DimensionDecorationManager stores decorations in multiple trees
 // corresponding to the layout of dimensions in the text.
 export class DimensionDecorationManager {
     dimension: string
     branchCondition: BranchCondition
-    decoration: Decoration
+    private decoration: Decoration
     children: DimensionDecorationManager[]
 
     constructor(dimension?: string, branchCondition?: BranchCondition, decoration?: Decoration) {
@@ -33,6 +26,13 @@ export class DimensionDecorationManager {
             this.decoration = decoration;
         }
         this.children = [];
+    }
+
+    get className(): string {
+        if (this.decoration) {
+            return this.decoration.getProperties().class;
+        }
+        return null;
     }
 
     // Given a DisplayMarker and class name, creates a new decoration with
@@ -132,48 +132,10 @@ export class DimensionDecorationManager {
         }
     }
 
-    getDecorationInfo(): DecorationInfo {
-        if (!this.decoration) {
-            return null;
-        }
-
-        const childrenDecorationInfo: DecorationInfo[] = this.children.map(child => {
-            return child.getDecorationInfo();
-        });
-
-        // Get the parent className, if any.
-        let parentClassName: string = this.decoration.getProperties().class;
-        // Slice off this dimension and branchcondition.
-        parentClassName = parentClassName.slice(0, parentClassName.lastIndexOf(this.dimension) - 1);
-
-        if (parentClassName === 'dimension-marker') {
-            // This dimension decoration is not nested in another dimension,
-            // so do not add a parentClassName attribute.
-            return {
-                dimension: this.dimension,
-                branchCondition: this.branchCondition,
-                className: this.decoration.getProperties().class,
-                children: childrenDecorationInfo
-            };
-        }
-        else {
-            return {
-                dimension: this.dimension,
-                branchCondition: this.branchCondition,
-                className: this.decoration.getProperties().class,
-                parentClassName: parentClassName,
-                children: childrenDecorationInfo
-            };
-        }
-    }
-
-    getAllDecorationInfo(): DecorationInfo[] {
+    getDecorations(): DimensionDecorationManager[] {
         if (this.decoration) {
-            return [this.getDecorationInfo()];
+            return [this];
         }
-
-        return this.children.map(child => {
-            return child.getDecorationInfo();
-        });
+        return this.children;
     }
 }
