@@ -11,14 +11,14 @@ const colorPickerHTML = `<div class="form-group dimension-ui-div" id="DIM">
   <h2>DIM</h2>
   <br>
   <div class="switch-toggle switch-3 switch-candy">
-    <input id="DIM-view-both" name="state-DIM" type="radio" checked="">
+    <input id="DIM-view-both" name="state-DIM" type="radio" value="BOTH" checked="">
     <label for="DIM-view-both">BOTH</label>
     <br>
-    <input id="DIM-view-thenbranch" name="state-DIM" type="radio">
-    <label for="DIM-view-thenbranch">DEF</label>
+    <input id="DIM-view-defbranch" name="state-DIM" type="radio" value="DEF">
+    <label for="DIM-view-defbranch">DEF</label>
     <br>
-    <input id="DIM-view-elsebranch" name="state-DIM" type="radio">
-    <label for="DIM-view-elsebranch">NDEF</label>
+    <input id="DIM-view-ndefbranch" name="state-DIM" type="radio" value="NDEF">
+    <label for="DIM-view-ndefbranch">NDEF</label>
   </div>
   <a href="" id="removeDimension-DIM" class="delete_icon"><img name="removeDimensionImg" border="0" src="${variationalEditorPath}/icons/delete-bin.png" width="16" height="18"></a>
   <br>

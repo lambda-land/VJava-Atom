@@ -20,29 +20,53 @@ import {
     ndefbranch
 } from './dimension-decoration-manager';
 import { VariationalEditorView } from './variational-editor-view';
-import { Queue, Stack } from './utils';
+import { Queue } from './utils';
 
 // Extend atom interfaces.
 declare module 'atom' {
+    interface DisplayLayer {
+        destroyFold: (id: number) => void;
+    }
+
+    // These methods are not documented in Atom's public API.
     export interface StyleManager {
-        // This method is not documented in Atom's public API. This method
-        // can be found in `src/style-manager.js` in Atom's GitHub.
+        // This method can be found in `src/style-manager.js` in Atom's GitHub.
         addStyleSheet(source: string, params?: any): Disposable;
+    }
+
+    export interface TextEditor {
+        // Access to underlying fold markers.
+        displayLayer: DisplayLayer;
+        // This method can be found in `src/text-editor.js` in Atom's GitHub.
+        foldBufferRange(range: Range): number;
+        // This method can be found in `src/text-editor.js` in Atom's GitHub.
+        destroyFoldsIntersectingBufferRange(range: Range): Range[]
     }
 }
 
 class VariationalEditor {
-    decorations: DimensionDecorationManager;
-    parsed: boolean;
-    sidePanel: Panel;
-    stylesheet: Disposable;
-    subscriptions: CompositeDisposable;
-    ui: VariationalEditorView;
+    private choiceFolds: {
+        [dimensionName: string]: {
+            branchCondition: BranchCondition;
+            foldIds: number[];
+        }
+    };
+    private decorations: DimensionDecorationManager;
+    private parsed: boolean;
+    private sidePanel: Panel;
+    private stylesheet: Disposable;
+    private subscriptions: CompositeDisposable;
+    private ui: VariationalEditorView;
 
     activate(state) {
         this.parsed = false;
         this.ui = new VariationalEditorView(state);
+
         this.ui.onColorChange(() => this.generateStyleSheet());
+        this.ui.onChooseChoice((dimension: string, condition: BranchCondition) => {
+            this.showDimensionChoice(dimension, condition)
+        });
+
         this.sidePanel = atom.workspace.addRightPanel({
             item: this.ui.sidePanel,
             visible: false
@@ -68,13 +92,21 @@ class VariationalEditor {
 
     toggle() {
         if (this.parsed) {
+            const editor = atom.workspace.getActiveTextEditor();
+            Object.keys(this.choiceFolds).forEach((key) => {
+                const choice = this.choiceFolds[key];
+                for (let foldId of choice.foldIds) {
+                    editor.displayLayer.destroyFold(foldId);
+                }
+            });
             this.decorations.destroy();
             this.stylesheet.dispose();
             this.sidePanel.hide();
         } else {
+            this.choiceFolds = {};
             this.decorations = new DimensionDecorationManager();
-            var contents = atom.workspace.getActiveTextEditor().getText();
 
+            const contents = atom.workspace.getActiveTextEditor().getText();
             //parse the file
             this.parseVariation(contents, () => { this.sidePanel.show(); });
         }
@@ -165,6 +197,71 @@ class VariationalEditor {
                 this.addDimensions(segment);
             }
         }
+    }
+
+    // Show the choice for a dimension, folding the other choice.
+    // If branchCondition is null, show all choices for the dimension.
+    showDimensionChoice(dimension: string, branchCondition: BranchCondition | null): void {
+        const editor = atom.workspace.getActiveTextEditor();
+        const existingFolds = this.choiceFolds[dimension];
+
+        const unfoldChoices: number[] = [];
+        if (existingFolds !== undefined) {
+            if (branchCondition === null) {
+                // Unfold all choices.
+                unfoldChoices.push(...existingFolds.foldIds);
+            }
+            else if (branchCondition === existingFolds.branchCondition) {
+                // When existing folds are for the branch condition that should
+                // be visible, unfold the branch condition.
+                unfoldChoices.push(...existingFolds.foldIds);
+            }
+        }
+
+        const foldChoices: DimensionDecorationManager[] = [];
+        let foldBranch: BranchCondition = null;
+        if (branchCondition === defbranch) {
+            foldChoices.push(...this.decorations.filterDimensionChoice(dimension, ndefbranch));
+            foldBranch = ndefbranch;
+        }
+        else if (branchCondition === ndefbranch) {
+            foldChoices.push(...this.decorations.filterDimensionChoice(dimension, defbranch));
+            foldBranch = defbranch;
+        }
+
+        const foldRanges: Range[] = [];
+        // The range of dimension choices ends at column 0 of the row the next
+        // preprocessor directive begins (ex. for "#ifdef", the range ends before
+        // the "#" in "#else"). This range results in the next preprocessor
+        // directive starting on the same line as the fold. We want it to start
+        // on the line after the fold, so adjust the range accordingly.
+        for (let choice of foldChoices) {
+            const newEndRow: number = choice.range.end.row - 1;
+            const range: Range = new Range(
+                choice.range.start,
+                [newEndRow, Infinity]);
+            foldRanges.push(range)
+        }
+
+        // Generate new folds.
+        if (foldBranch === null) {
+            if (this.choiceFolds.hasOwnProperty(dimension)) {
+                delete this.choiceFolds[dimension];
+            }
+        }
+        else {
+            this.choiceFolds[dimension] = {
+                branchCondition: foldBranch,
+                foldIds: foldRanges.map((r: Range) => {
+                    return editor.foldBufferRange(r);
+                })
+            }
+        }
+
+        // Unfold previous folds (if any).
+        unfoldChoices.forEach((foldId: number) => {
+            editor.displayLayer.destroyFold(foldId);
+        });
     }
 
     // Create a stylesheet for the dimension colors.

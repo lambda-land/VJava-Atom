@@ -2,6 +2,8 @@
 import $ from 'jquery';
 import path from 'path';
 
+import { BranchCondition, defbranch, ndefbranch } from './dimension-decoration-manager';
+
 
 export type DimensionStatus = "DEF" | "NDEF" | "BOTH"
 
@@ -21,7 +23,8 @@ const iconsPath = path.resolve(
 
 export class VariationalEditorView {
     main: JQuery;
-    onColorChangeCb: () => any;
+    private onChooseChoiceCb: (dimension: string, c: BranchCondition) => any;
+    private onColorChangeCb: () => any;
     panelMenus: { [dimension: string]: DimensionUI };
     secondary: JQuery;
     sidePanel: JQuery;
@@ -67,19 +70,23 @@ export class VariationalEditorView {
                 element: null
             };
             const panelMenu = this.panelMenus[name];
-            const element = $(`<div class='form-group dimension-ui-div' id='${name}'>
+
+            const idBoth: string = `${name}-view-both`;
+            const idDef: string = `${name}-view-defbranch`;
+            const idNDef: string = `${name}-view-ndefbranch`;
+            const element: JQuery = $(`<div class='form-group dimension-ui-div' id='${name}'>
   <input class='colorpicker' type='text' id="${name}-colorpicker">
   <h2>${name}</h2>
   <br>
   <div class="switch-toggle switch-3 switch-candy">
-    <input id="${name}-view-both" name="state-${name}" type="radio" checked>
-    <label for="${name}-view-both">BOTH</label>
+    <input id="${idBoth}" name="state-${name}" type="radio" value="BOTH" checked>
+    <label for="${idBoth}">BOTH</label>
     <br>
-    <input id="${name}-view-thenbranch" name="state-${name}" type="radio" >
-    <label for="${name}-view-thenbranch">DEF</label>
+    <input id="${idDef}" name="state-${name}" type="radio" value="DEF" >
+    <label for="${idDef}">DEF</label>
     <br>
-    <input id="${name}-view-elsebranch" name="state-${name}" type="radio" >
-    <label for="${name}-view-elsebranch">NDEF</label>
+    <input id="${idNDef}" name="state-${name}" type="radio" value="NDEF" >
+    <label for="${idNDef}">NDEF</label>
   </div>
   <a href='' id='removeDimension-${name}' class='delete_icon'><img name='removeDimensionImg' border="0" src="${iconsPath}/delete-bin.png" width="16" height="18"></a>
   <br>
@@ -96,6 +103,17 @@ export class VariationalEditorView {
                 panelMenu.color = panelMenu.colorpicker.spectrum('get').toRgbString();
                 this.onColorChangeCb();
             });
+
+            panelMenu.element.find(`#${idBoth}`).on('click', () => {
+                this.onChooseChoiceCb(name, null)
+            });
+            panelMenu.element.find(`#${idDef}`).on('click', () => {
+                this.onChooseChoiceCb(name, defbranch)
+            });
+            panelMenu.element.find(`#${idNDef}`).on('click', () => {
+                this.onChooseChoiceCb(name, ndefbranch)
+            });
+
             this.main.append(element);
         }
     }
@@ -118,7 +136,36 @@ export class VariationalEditorView {
         return this.panelMenus[name].color;
     }
 
+    // Get selected branch condition from panel menu for dimension.
+    getVisibleChoice(dimension: string): BranchCondition | null {
+        const panelMenu = this.getPanelMenu(dimension);
+        const status: DimensionStatus = panelMenu.element
+            .find(`input[name=state-${panelMenu.name}]:checked`)
+            .val() as DimensionStatus;
+
+        // Cannot statically guarantee JQuery object will return a
+        // DimensionStatus string, so use a run time check.
+        if (['BOTH', 'DEF', 'NDEF'].indexOf(status as string) == -1) {
+            throw new Error(
+                `Dimension ${panelMenu.name} has invalid DimensionStatus: ${status}`);
+        }
+
+        if (status == 'BOTH') {
+            return null;
+        }
+        if (status == 'DEF') {
+            return defbranch;
+        }
+        if (status == 'NDEF') {
+            return ndefbranch;
+        }
+    }
+
     onColorChange(cb: () => any): void {
         this.onColorChangeCb = cb;
+    }
+
+    onChooseChoice(cb: (dimension: string, c: BranchCondition) => any): void {
+        this.onChooseChoiceCb = cb;
     }
 }

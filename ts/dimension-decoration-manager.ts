@@ -35,6 +35,13 @@ export class DimensionDecorationManager {
         return null;
     }
 
+    get range(): Range {
+        if (this.decoration) {
+            return this.decoration.getMarker().getBufferRange();
+        }
+        return null;
+    }
+
     // Given a DisplayMarker and class name, creates a new decoration with
     // the dimensionName and branchCondition.
     // The class name for top level Decorations is
@@ -99,17 +106,21 @@ export class DimensionDecorationManager {
     compareDecorations(m1: DisplayMarker, m2: DisplayMarker): 'parent' | 'child' | 'above' | 'below' {
         const r1: Range = m1.getBufferRange()
         const r2: Range = m2.getBufferRange();
-        if (r1.end.row < r2.start.row) {
-            return 'above';
-        }
-        else if (r1.start.row > r2.end.row) {
-            return 'below';
-        }
-        else if (r1.start.row < r2.start.row && r1.end.row > r2.end.row) {
+
+        if (r1.containsRange(r2)) {
             return 'parent';
         }
-        else if (r1.start.row > r2.start.row && r1.end.row < r2.end.row) {
+
+        if (r2.containsRange(r1)) {
             return 'child';
+        }
+
+        if (r1.compare(r2) == -1 && !r1.intersectsWith(r2)) {
+            return 'above';
+        }
+
+        if (r1.compare(r2) == 1 && !r1.intersectsWith(r2)) {
+            return 'below';
         }
 
         throw new Error('Dimension is malformed; it should be either a parent, child, above, or below');
@@ -137,5 +148,35 @@ export class DimensionDecorationManager {
             return [this];
         }
         return this.children;
+    }
+
+    filterDimension(dimension: string): DimensionDecorationManager[] {
+        const decorations: DimensionDecorationManager[] = [];
+
+        if (this.decoration && this.dimension == dimension) {
+            decorations.push(this);
+        }
+
+        for (let decoration of this.children) {
+            decorations.push(...decoration.filterDimension(dimension));
+        }
+
+        return decorations;
+    }
+
+    filterDimensionChoice(dimension: string, choice: BranchCondition): DimensionDecorationManager[] {
+        const decorations: DimensionDecorationManager[] = [];
+
+        if (this.decoration) {
+            if (this.dimension == dimension && this.branchCondition == choice) {
+                decorations.push(this);
+            }
+        }
+
+        for (let decoration of this.children) {
+            decorations.push(...decoration.filterDimensionChoice(dimension, choice));
+        }
+
+        return decorations;
     }
 }

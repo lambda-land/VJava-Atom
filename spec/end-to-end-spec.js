@@ -1,5 +1,6 @@
 'use babel';
 
+import { Range } from 'atom';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as temp from 'temp';
@@ -101,40 +102,39 @@ describe('end to end tests', () => {
 
       runs(() => {
         // Check the decoration markers are present on the editor.
-        // spans contains the start and end rows for the given dimension
-        // branch.
         const expectedDecorations = {
           'dimension-marker-DEC-defbranch': {
             length: 2,
-            spans: [[4, 5], [24, 25]]
+            ranges: [new Range([4, 0], [5, 0]),
+                     new Range([24, 0], [25, 0])]
           },
           'dimension-marker-DEC-ndefbranch': {
             length: 1,
-            spans: [[6, 7]]
+            ranges: [new Range([6, 0], [7, 0])]
           },
           'dimension-marker-MULT-defbranch': {
             length: 1,
-            spans: [[10, 16]]
+            ranges: [new Range([10, 0], [16, 0])]
           },
           'dimension-marker-MULT-ndefbranch': {
             length: 1,
-            spans: [[17, 18]]
+            ranges: [new Range([17, 0], [18, 0])]
           },
           'dimension-marker-BIG-defbranch': {
             length: 0,
-            spans: []
+            ranges: []
           },
           'dimension-marker-BIG-ndefbranch': {
             length: 1,
-            spans: [[34, 35]]
+            ranges: [new Range([34, 0], [35, 0])]
           },
           'dimension-marker-MULT-defbranch-BIG-defbranch': {
             length: 1,
-            spans: [[11, 12]]
+            ranges: [new Range([11, 0], [12, 0])]
           },
           'dimension-marker-MULT-defbranch-BIG-ndefbranch': {
             length: 1,
-            spans: [[13, 14]]
+            ranges: [new Range([13, 0], [14, 0])]
           }
         }
         let editor = atom.workspace.getActiveTextEditor();
@@ -149,11 +149,11 @@ describe('end to end tests', () => {
 
           for (let decoration of decorations) {
             const range = decoration.getMarker().getBufferRange();
-            const span = [range.start.row, range.end.row];
 
-            // The span of the decoration should exist in the expected
-            // decoration spans.
-            expect(expectedDecoration.spans).toContain(span);
+            // The range of the decoration should exist in the expected
+            // decoration ranges.
+            expect(expectedDecoration.ranges.map((r) => { return r.isEqual(range); }))
+              .toContain(true);
           }
         }
 
