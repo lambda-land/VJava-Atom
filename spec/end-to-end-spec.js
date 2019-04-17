@@ -255,5 +255,41 @@ describe('end to end tests', () => {
         expect(atom.styles.styleElements.indexOf(styleSheet)).toBe(-1);
       });
     });
+
+    it('hides the preprocessor predicates', () => {
+      // This is an activation event, triggering it will cause the package to be
+      // activated.
+      atom.commands.dispatch(workspaceElement, 'variational-editor:toggle');
+
+      waitsForPromise(() => {
+        return activationPromise.then(() => {
+          // The parseVariation method called when the package is toggled on spawns
+          // a process and calls a callback. The method returns before the process
+          // and callback finish executing causing the activationPromise to think
+          // the package activation is finished when it really isn't. Set a timeout
+          // for the time being to allow the package to finish its work before
+          // testing expectations.
+          waits(1000);
+        });
+      });
+
+      runs(() => {
+        let editor = atom.workspace.getActiveTextEditor();
+
+        expect(editor.lineTextForBufferRow(3)).toBe('\n');  // #ifdef DEC
+        expect(editor.lineTextForBufferRow(5)).toBe('\n');  // #else
+        expect(editor.lineTextForBufferRow(7)).toBe('\n');  // #endif
+
+        editor.setCursorBufferPosition([3, 0]);
+
+        expect(editor.lineTextForBufferRow(3)).toBe('#ifdef DEC');
+
+        // Untoggle the variational-editor command.
+        atom.commands.dispatch(workspaceElement, 'variational-editor:toggle');
+        waits(1000);
+
+        
+      });
+    });
   });
 });

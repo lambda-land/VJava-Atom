@@ -19,6 +19,7 @@ import {
     defbranch,
     ndefbranch
 } from './dimension-decoration-manager';
+import { LineSuppressor } from './line-suppressor';
 import { VariationalEditorView } from './variational-editor-view';
 import { Queue } from './utils';
 
@@ -52,6 +53,7 @@ class VariationalEditor {
         }
     };
     private decorations: DimensionDecorationManager;
+    private hiddenPredicates: LineSuppressor;
     private parsed: boolean;
     private sidePanel: Panel;
     private stylesheet: Disposable;
@@ -71,6 +73,7 @@ class VariationalEditor {
             item: this.ui.sidePanel,
             visible: false
         });
+
         this.subscriptions = new CompositeDisposable();
 
         // Register command that toggles veditor view
@@ -100,11 +103,13 @@ class VariationalEditor {
                 }
             });
             this.decorations.destroy();
+            this.hiddenPredicates.destroy();
             this.stylesheet.dispose();
             this.sidePanel.hide();
         } else {
             this.choiceFolds = {};
             this.decorations = new DimensionDecorationManager();
+            this.hiddenPredicates = new LineSuppressor();
 
             const contents = atom.workspace.getActiveTextEditor().getText();
             //parse the file
@@ -187,6 +192,9 @@ class VariationalEditor {
 
     addDimensions(node: SegmentNode | RegionNode) {
         if (node.type === 'choice') {
+            this.hiddenPredicates.add(node.thenbranch.span['start'][0]);
+            this.hiddenPredicates.add(node.thenbranch.span['end'][0]);
+            this.hiddenPredicates.add(node.elsebranch.span['end'][0]);
             this.ui.createPanelMenu(node.name);
             this.addDecoration(node);
             this.addDimensions(node.thenbranch);
