@@ -27,6 +27,7 @@ import { Queue } from './utils';
 declare module 'atom' {
     interface DisplayLayer {
         destroyFold: (id: number) => void;
+        foldsMarkerLayer: MarkerLayer;
     }
 
     // These methods are not documented in Atom's public API.
@@ -40,6 +41,8 @@ declare module 'atom' {
         displayLayer: DisplayLayer;
         // This method can be found in `src/text-editor.js` in Atom's GitHub.
         foldBufferRange(range: Range): number;
+        // This method can be found in `src/text-editor.js` in Atom's Github.
+        foldBufferRowRange(startRow: number, endRow: number): number;
         // This method can be found in `src/text-editor.js` in Atom's GitHub.
         destroyFoldsIntersectingBufferRange(range: Range): Range[]
     }
