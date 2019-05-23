@@ -74,8 +74,7 @@ export class DimensionDecorationManager {
             if (comparison === 'child') {
                 return node.addDecoration(marker, dimension, branchCondition);
             }
-
-            if (comparison === 'above') {
+            else if (comparison === 'above') {
                 decoration = this.createDecoration(marker, className);
                 // Append the decoration to the end of children and swap left
                 // until it is in the place of children[i].
@@ -86,6 +85,12 @@ export class DimensionDecorationManager {
                     this.children[j] = this.children[j - 1];
                     this.children[j - 1] = temp;
                 }
+                return;
+            }
+            else if (comparison === 'same') {
+                // Update the branch and dimension to reflect those passed in.
+                node.branchCondition = branchCondition;
+                node.dimension = dimension;
                 return;
             }
         }
@@ -103,7 +108,7 @@ export class DimensionDecorationManager {
     // If decoration1 is a sibling to decoration2, returns 'above' or 'below'
     // depending on whether decoration1 is above or below decoration2.
     // If decoration1 is encompassed by decoration2, returns 'child'
-    compareDecorations(m1: DisplayMarker, m2: DisplayMarker): 'parent' | 'child' | 'above' | 'below' {
+    compareDecorations(m1: DisplayMarker, m2: DisplayMarker): 'parent' | 'child' | 'above' | 'below' | 'same' {
         const r1: Range = m1.getBufferRange()
         const r2: Range = m2.getBufferRange();
 
@@ -111,17 +116,22 @@ export class DimensionDecorationManager {
             return 'parent';
         }
 
-        if (r2.containsRange(r1)) {
+        else if (r2.containsRange(r1)) {
             return 'child';
         }
 
-        if (r1.compare(r2) == -1 && !r1.intersectsWith(r2)) {
+        else if (r1.compare(r2) == -1 && !r1.intersectsWith(r2)) {
             return 'above';
         }
 
-        if (r1.compare(r2) == 1 && !r1.intersectsWith(r2)) {
+        else if (r1.compare(r2) == 1 && !r1.intersectsWith(r2)) {
             return 'below';
         }
+
+        else if (r1.isEqual(r2)) {
+            return 'same';
+        }
+
 
         throw new Error('Dimension is malformed; it should be either a parent, child, above, or below');
     }

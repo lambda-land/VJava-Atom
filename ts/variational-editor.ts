@@ -54,6 +54,7 @@ class VariationalEditor {
     };
     private decorations: DimensionDecorationManager;
     private hiddenPredicates: LineSuppressor;
+    private onDidStopChangeCB: Disposable;
     private parsed: boolean;
     private sidePanel: Panel;
     private stylesheet: Disposable;
@@ -94,19 +95,26 @@ class VariationalEditor {
     }
 
     toggle() {
+        const editor = atom.workspace.getActiveTextEditor();
         if (this.parsed) {
-            const editor = atom.workspace.getActiveTextEditor();
             Object.keys(this.choiceFolds).forEach((key) => {
                 const choice = this.choiceFolds[key];
                 for (let foldId of choice.foldIds) {
                     editor.displayLayer.destroyFold(foldId);
                 }
             });
+
+            this.onDidStopChangeCB.dispose();
             this.decorations.destroy();
             this.hiddenPredicates.destroy();
             this.stylesheet.dispose();
             this.sidePanel.hide();
         } else {
+            this.onDidStopChangeCB = editor.onDidStopChanging(() => {
+                const contents = atom.workspace.getActiveTextEditor().getText();
+                //parse the file
+                this.parseVariation(contents);
+            });
             this.choiceFolds = {};
             this.decorations = new DimensionDecorationManager();
             this.hiddenPredicates = new LineSuppressor();
@@ -119,7 +127,7 @@ class VariationalEditor {
         this.parsed = !this.parsed;
     }
 
-    parseVariation(textContents: string, next: () => void) {
+    parseVariation(textContents: string, next?: () => void) {
         const packagePath = atom.packages.resolvePackagePath("variational-editor-atom");
 
         const parserPath = path.resolve(packagePath, "lib", "variational-parser");
@@ -145,7 +153,9 @@ class VariationalEditor {
                 throw new TypeError('Expected segments attribute on parsed JSON');
             }
 
-            next();
+            if (next !== undefined) {
+                next();
+            }
         });
 
         parserProcess.stdin.write(textContents);
