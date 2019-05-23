@@ -19,7 +19,7 @@ import {
     defbranch,
     ndefbranch
 } from './dimension-decoration-manager';
-import { LineSuppressor } from './line-suppressor';
+import { PredicateSuppressor } from './predicate-suppressor';
 import { VariationalEditorView } from './variational-editor-view';
 import { Queue } from './utils';
 
@@ -56,7 +56,7 @@ class VariationalEditor {
         }
     };
     private decorations: DimensionDecorationManager;
-    private hiddenPredicates: LineSuppressor;
+    private hiddenPredicates: PredicateSuppressor;
     private parsed: boolean;
     private sidePanel: Panel;
     private stylesheet: Disposable;
@@ -112,7 +112,7 @@ class VariationalEditor {
         } else {
             this.choiceFolds = {};
             this.decorations = new DimensionDecorationManager();
-            this.hiddenPredicates = new LineSuppressor();
+            this.hiddenPredicates = new PredicateSuppressor();
 
             const contents = atom.workspace.getActiveTextEditor().getText();
             //parse the file
@@ -241,15 +241,20 @@ class VariationalEditor {
         }
 
         const foldRanges: Range[] = [];
+        // The range of dimension choices starts at column 0 of the dimensions
+        // preprocessor directive. Since this directive is folded by the
+        // PredicateSuppressor, the fold for the dimension range should start
+        // one line below the preprocessor directive.
         // The range of dimension choices ends at column 0 of the row the next
         // preprocessor directive begins (ex. for "#ifdef", the range ends before
         // the "#" in "#else"). This range results in the next preprocessor
         // directive starting on the same line as the fold. We want it to start
         // on the line after the fold, so adjust the range accordingly.
         for (let choice of foldChoices) {
+            const newStartRow: number = choice.range.start.row + 1;
             const newEndRow: number = choice.range.end.row - 1;
             const range: Range = new Range(
-                choice.range.start,
+                [newStartRow, 0],
                 [newEndRow, Infinity]);
             foldRanges.push(range)
         }
