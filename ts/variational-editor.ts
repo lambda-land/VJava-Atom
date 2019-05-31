@@ -112,8 +112,15 @@ class VariationalEditor {
         } else {
             this.onDidStopChangeCB = editor.onDidStopChanging(() => {
                 const contents = atom.workspace.getActiveTextEditor().getText();
+
+                // To eliminate dimension decorations that should no longer exist,
+                // use mark and sweep similar to garbage collection. Unmark all
+                // decorations, parse the updated file, then sweep all decorations
+                // that remain unmarked.
+                this.decorations.unmark();
                 //parse the file
                 this.parseVariation(contents);
+                this.decorations.sweep();
             });
             this.choiceFolds = {};
             this.decorations = new DimensionDecorationManager();

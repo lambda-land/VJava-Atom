@@ -14,6 +14,7 @@ export class DimensionDecorationManager {
     branchCondition: BranchCondition
     private decoration: Decoration
     children: DimensionDecorationManager[]
+    marked: boolean
 
     constructor(dimension?: string, branchCondition?: BranchCondition, decoration?: Decoration) {
         if (dimension !== undefined) {
@@ -26,6 +27,8 @@ export class DimensionDecorationManager {
             this.decoration = decoration;
         }
         this.children = [];
+
+        this.marked = true;
     }
 
     get className(): string {
@@ -91,6 +94,7 @@ export class DimensionDecorationManager {
                 // Update the branch and dimension to reflect those passed in.
                 node.branchCondition = branchCondition;
                 node.dimension = dimension;
+                node.marked = true;
                 return;
             }
         }
@@ -188,5 +192,36 @@ export class DimensionDecorationManager {
         }
 
         return decorations;
+    }
+
+    // Recursively unmark DimensionDecorationManagers, unless they do not hold
+    // a decoration.
+    unmark() {
+        if (this.decoration) {
+            this.marked = false;
+        }
+
+        for (let decoration of this.children) {
+            decoration.unmark();
+        }
+    }
+
+    // Recursively delete unmarked DimensionDecorationManagers.
+    sweep() {
+        // First sweep all children. Otherwise the marked children wont be
+        // propogated forward.
+        const unmarked = []
+        for (let decoration of this.children) {
+            decoration.sweep();
+            if (!decoration.marked) {
+                unmarked.push(decoration);
+            }
+        }
+
+        // Replace any unmarked decorations with their child decorations.
+        for (let unmarkedChild of unmarked) {
+            const idx = this.children.indexOf(unmarkedChild);
+            this.children.splice(idx, 1, ...unmarkedChild.children);
+        }
     }
 }
