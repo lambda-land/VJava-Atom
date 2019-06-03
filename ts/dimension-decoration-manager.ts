@@ -210,7 +210,7 @@ export class DimensionDecorationManager {
     sweep() {
         // First sweep all children. Otherwise the marked children wont be
         // propogated forward.
-        const unmarked = []
+        const unmarked: DimensionDecorationManager[] = []
         for (let decoration of this.children) {
             decoration.sweep();
             if (!decoration.marked) {
@@ -222,6 +222,8 @@ export class DimensionDecorationManager {
         for (let unmarkedChild of unmarked) {
             const idx = this.children.indexOf(unmarkedChild);
             this.children.splice(idx, 1, ...unmarkedChild.children);
+            // Destroy the decoration.
+            unmarkedChild.decoration.getMarker().destroy();
         }
     }
 }
