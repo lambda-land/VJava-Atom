@@ -112,15 +112,8 @@ class VariationalEditor {
         } else {
             this.onDidStopChangeCB = editor.onDidStopChanging(() => {
                 const contents = atom.workspace.getActiveTextEditor().getText();
-
-                // To eliminate dimension decorations that should no longer exist,
-                // use mark and sweep similar to garbage collection. Unmark all
-                // decorations, parse the updated file, then sweep all decorations
-                // that remain unmarked.
-                this.decorations.unmark();
                 //parse the file
                 this.parseVariation(contents);
-                this.decorations.sweep();
             });
             this.choiceFolds = {};
             this.decorations = new DimensionDecorationManager();
@@ -153,15 +146,27 @@ class VariationalEditor {
             const dimensions = JSON.parse(data);
 
             if (dimensions.type === 'region') {
+                // To eliminate dimension decorations that should no longer exist,
+                // use mark and sweep similar to garbage collection. Unmark all
+                // decorations, parse the updated file, then sweep all decorations
+                // that remain unmarked.
+                this.decorations.unmark();
                 this.addDimensions(dimensions);
+                this.decorations.sweep();
+
                 this.generateStyleSheet();
+
+                if (next !== undefined) {
+                    next();
+                }
             }
             else {
-                throw new TypeError('Expected segments attribute on parsed JSON');
-            }
-
-            if (next !== undefined) {
-                next();
+                // TODO: Handle malformed output from backend. Throwing an error
+                //       will create a bright red Error modal in Atom. Maybe
+                //       create our own smaller, less distinct modal telling the
+                //       user the dimensions are malformed? Possibly give the row
+                //       and column where the issue is detected? Not sure if the
+                //       backend can give that information.
             }
         });
 
