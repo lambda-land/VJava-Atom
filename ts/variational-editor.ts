@@ -141,13 +141,15 @@ class VariationalEditor {
             const dimensions = JSON.parse(data);
 
             if (dimensions.type === 'region') {
-                // To eliminate dimension decorations that should no longer exist,
+                // To eliminate dimension that should no longer exist,
                 // use mark and sweep similar to garbage collection. Unmark all
-                // decorations, parse the updated file, then sweep all decorations
+                // dimensions, parse the updated file, then sweep all dimensions
                 // that remain unmarked.
                 this.decorations.unmark();
+                this.ui.unmark();
                 this.addDimensions(dimensions);
                 this.decorations.sweep();
+                this.ui.sweep();
 
                 this.generateStyleSheet();
 
@@ -157,7 +159,7 @@ class VariationalEditor {
             }
             else {
                 // TODO: Handle malformed output from backend. Throwing an error
-                //       will create a bright red Error modal in Atom. Maybe
+                //       will create repeated bright red Error modal in Atom. Maybe
                 //       create our own smaller, less distinct modal telling the
                 //       user the dimensions are malformed? Possibly give the row
                 //       and column where the issue is detected? Not sure if the

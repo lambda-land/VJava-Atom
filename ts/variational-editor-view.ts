@@ -12,6 +12,7 @@ export interface DimensionUI {
     color: string;
     colorpicker?: JQuery;
     element: JQuery;
+    visible: boolean;
 }
 
 export type Branch = "thenbranch" | "elsebranch";
@@ -62,12 +63,14 @@ export class VariationalEditorView {
 
     createPanelMenu(name: string, color?: string) {
         const dimensionColor: string = color ? color : 'rgb(127, 71, 62)';
+
         if (!this.hasPanelMenu(name)) {
             this.panelMenus[name] = {
                 name: name,
                 color: dimensionColor,
                 colorpicker: null,
-                element: null
+                element: null,
+                visible: true,
             };
             const panelMenu = this.panelMenus[name];
 
@@ -115,6 +118,13 @@ export class VariationalEditorView {
             });
 
             this.main.append(element);
+        }
+        else {
+            const panelMenu = this.getPanelMenu(name);
+            if (!panelMenu.visible) {
+                this.main.append(panelMenu.element);
+                panelMenu.visible = true;
+            }
         }
     }
 
@@ -167,5 +177,20 @@ export class VariationalEditorView {
 
     onChooseChoice(cb: (dimension: string, c: BranchCondition) => any): void {
         this.onChooseChoiceCb = cb;
+    }
+
+    unmark(): void {
+        Object.keys(this.panelMenus).forEach(key => {
+            this.panelMenus[key].visible = false;
+        });
+    }
+
+    // Remove all panel menus that shouldn't be visible from the side panel.
+    sweep(): void {
+        Object.keys(this.panelMenus).forEach(key => {
+            if (!this.panelMenus[key].visible) {
+                this.panelMenus[key].element.detach();
+            }
+        });
     }
 }
