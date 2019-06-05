@@ -30,7 +30,7 @@ export class VariationalEditorView {
     sidePanel: JQuery;
 
     constructor(state = {}) {
-        this.sidePanel = $('<div id="variationalEditorSidePanel"></div>');
+        this.sidePanel = $('<div id="variationalEditorSidePanel" style="overflow-y:auto;"></div>');
         // this.main holds the spectrum colorpickers.
         this.main = $('<div id="variationalEditorUI"></div>');
         this.sidePanel.append(this.main);
