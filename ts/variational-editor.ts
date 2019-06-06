@@ -1,5 +1,6 @@
 'use babel';
 
+// Import npm modules.
 import 'spectrum-colorpicker';
 import {
     CompositeDisposable,
@@ -12,6 +13,7 @@ import {
 import { spawn } from 'child_process';
 import path from 'path';
 
+// Import local modules.
 import { ChoiceNode, RegionNode, SegmentNode } from './ast';
 import {
     BranchCondition,
@@ -44,6 +46,8 @@ declare module 'atom' {
     }
 }
 
+// This is the entry point to Atom. It manages all components of the Variational
+// Editor frontend.
 class VariationalEditor {
     private choiceFolds: {
         [dimensionName: string]: {
@@ -59,11 +63,16 @@ class VariationalEditor {
     private subscriptions: CompositeDisposable;
     private ui: VariationalEditorView;
 
+    // This method is called when variational-editor-atom is first turned on.
     activate(state) {
         this.parsed = false;
         this.ui = new VariationalEditorView(state);
 
+        // Whenever the dimension color is changed in the side panel, create
+        // a new stylesheet.
         this.ui.onColorChange(() => this.generateStyleSheet());
+        // Whenever a choice is toggled in the side panel, show/hide those
+        // choices.
         this.ui.onChooseChoice((dimension: string, condition: BranchCondition) => {
             this.showDimensionChoice(dimension, condition)
         });
@@ -74,12 +83,13 @@ class VariationalEditor {
         });
         this.subscriptions = new CompositeDisposable();
 
-        // Register command that toggles veditor view
+        // Register command that toggles variational-editor-atom.
         this.subscriptions.add(atom.commands.add('atom-workspace', {
             'variational-editor:toggle': () => this.toggle()
         }));
     }
 
+    // This method is called before Atom exits.
     deactivate() {
         this.decorations.destroy();
         this.sidePanel.destroy();
@@ -87,13 +97,18 @@ class VariationalEditor {
         this.ui.destroy();
     }
 
+    // Save color state of the dimensions in the side panel. This method is
+    // called by Atom before exiting.
     serialize() {
         return this.ui.serialize();
     }
 
+    // Toggle the UI on/off.
     toggle() {
         const editor = atom.workspace.getActiveTextEditor();
+
         if (this.parsed) {
+            // Unfold all folded choices.
             Object.keys(this.choiceFolds).forEach((key) => {
                 const choice = this.choiceFolds[key];
                 for (let foldId of choice.foldIds) {
@@ -104,47 +119,58 @@ class VariationalEditor {
             this.onDidStopChangeCB.dispose();
             this.decorations.destroy();
             this.stylesheet.dispose();
+            // Hide the side panel, but don't destroy it. Then it does not need
+            // to be recreated every time the UI is toggled on.
             this.sidePanel.hide();
         } else {
+            // When the text is changed, reparse the buffer contents.
             this.onDidStopChangeCB = editor.onDidStopChanging(() => {
                 const contents = atom.workspace.getActiveTextEditor().getText();
                 //parse the file
                 this.parseVariation(contents);
             });
+
             this.choiceFolds = {};
             this.decorations = new DimensionDecorationManager();
 
+            // Parse the file to update the UI for the current state of the
+            // buffer.
             const contents = atom.workspace.getActiveTextEditor().getText();
-            //parse the file
             this.parseVariation(contents, () => { this.sidePanel.show(); });
         }
 
         this.parsed = !this.parsed;
     }
 
+    // Accepts file contents as a string and a function to be run once the file
+    // has been parsed and the UI updated.
     parseVariation(textContents: string, next?: () => void) {
+        // Get the path to the variational-parser.
         const packagePath = atom.packages.resolvePackagePath("variational-editor-atom");
-
         const parserPath = path.resolve(packagePath, "lib", "variational-parser");
 
+        // Run the parser in a new process.
         const parserProcess = spawn(parserPath, [], { cwd: packagePath });
         parserProcess.stdout.setEncoding('utf8');
 
+        // Read the data from the parser process as it comes in.
         let data = '';
         parserProcess.stdout.on('data', (chunk) => {
             data += chunk.toString();
         });
-        // Currently `code` isn't used, but it's required because the process
-        // passes a code to this function. For now ignore any typescript
-        // warnings about its value never being read.
+
+        // When the process exits, update the UI.
+        // NOTE: Currently `code` isn't used, but it's required because the
+        //       process passes a code to this function. For now ignore any
+        //       typescript warnings about its value never being read.
         parserProcess.on('exit', (code) => {
             const dimensions = JSON.parse(data);
 
             if (dimensions.type === 'region') {
-                // To eliminate dimension that should no longer exist,
-                // use mark and sweep similar to garbage collection. Unmark all
-                // dimensions, parse the updated file, then sweep all dimensions
-                // that remain unmarked.
+                // To eliminate dimension that should no longer exist, use mark
+                // and sweep similar to garbage collection. Unmark all
+                // dimensions, parse the file and add the dimension, then sweep
+                // all dimensions that remain unmarked.
                 this.decorations.unmark();
                 this.ui.unmark();
                 this.addDimensions(dimensions);
@@ -171,9 +197,11 @@ class VariationalEditor {
         parserProcess.stdin.end();
     }
 
+    // Create a decoration for a given predicate directive block.
     addDecoration(node: ChoiceNode) {
         const editor: TextEditor = atom.workspace.getActiveTextEditor();
 
+        // Determine if the then branch is positive or negative.
         let thenBranch: BranchCondition;
         if (node.kind === 'positive') {
             thenBranch = defbranch;
@@ -182,21 +210,18 @@ class VariationalEditor {
             thenBranch = ndefbranch;
         }
 
+        // Create a display marker for the then branch.
         const thenNode = node.thenbranch;
         const thenRange: Range = new Range(
             [thenNode.span.start[0] + 1, 0],
             [thenNode.span.end[0], 0]);
         const thenMarker: DisplayMarker = editor.markBufferRange(thenRange);
 
+        // Add the marker to the decoration manager for this dimension/choice region.
         this.decorations.addDecoration(thenMarker, node.name, thenBranch);
 
+        // If the else branch exists on this node, add it in the same manner.
         if (node.elsebranch.segments.length > 0) {
-            const elseNode = node.elsebranch;
-            const elseRange: Range = new Range(
-                [elseNode.span.start[0] + 1, 0],
-                [elseNode.span.end[0], 0]);
-            const elseMarker: DisplayMarker = editor.markBufferRange(elseRange);
-
             let elseBranch: BranchCondition;
             if (thenBranch === defbranch) {
                 elseBranch = ndefbranch;
@@ -205,10 +230,17 @@ class VariationalEditor {
                 elseBranch = defbranch;
             }
 
+            const elseNode = node.elsebranch;
+            const elseRange: Range = new Range(
+                [elseNode.span.start[0] + 1, 0],
+                [elseNode.span.end[0], 0]);
+            const elseMarker: DisplayMarker = editor.markBufferRange(elseRange);
+
             this.decorations.addDecoration(elseMarker, node.name, elseBranch);
         }
     }
 
+    // Recursively add dimensions/choices to the UI.
     addDimensions(node: SegmentNode | RegionNode) {
         if (node.type === 'choice') {
             this.ui.createPanelMenu(node.name);
@@ -242,6 +274,7 @@ class VariationalEditor {
             }
         }
 
+        // Find the choices that should be folded for this dimension.
         const foldChoices: DimensionDecorationManager[] = [];
         let foldBranch: BranchCondition = null;
         if (branchCondition === defbranch) {
@@ -267,7 +300,7 @@ class VariationalEditor {
             foldRanges.push(range)
         }
 
-        // Generate new folds.
+        // Generate new folds for the dimension choices.
         if (foldBranch === null) {
             if (this.choiceFolds.hasOwnProperty(dimension)) {
                 delete this.choiceFolds[dimension];
@@ -300,18 +333,24 @@ class VariationalEditor {
             decorationManager: DimensionDecorationManager
         }
 
+        // Use queue for BFS of dimension/choices.
         const decorationQueue: Queue<QueueNode> = new Queue();
 
+        // Prime the queue with the top level choices.
         for (let d of this.decorations.getDecorations()) {
             decorationQueue.push({ parentClass: undefined, decorationManager: d });
         }
 
+        // The CSS generated contains linear gradient styles. In order to build
+        // up the linear gradients for successive dimensions, it is easier to
+        // cache the style in a map.
         const linearGradientCache: { [key: string]: string } = {};
         let css: string = '';
 
         while (!decorationQueue.empty()) {
             const { parentClass, decorationManager } = decorationQueue.pop();
 
+            // Add the child choices to the queue.
             for (let d of decorationManager.children) {
                 decorationQueue.push(
                     { parentClass: decorationManager.className, decorationManager: d }
@@ -319,9 +358,14 @@ class VariationalEditor {
             };
 
             if (!linearGradientCache.hasOwnProperty(decorationManager.className)) {
+                // The linear gradient cache does not have a style for the current
+                // classname, so generate the style for it.
                 const dimensionColor: string = this.ui.getDimensionColor(decorationManager.dimension);
 
                 let branchcolor: string, branchcursorcolor: string, branchhovercolor: string;
+                // Differentiate the shade of the color for positive/negative
+                // choices and for different states of the line in the editor.
+                // (ie. when hovering over a line, a cursor is on the line, etc.)
                 if (decorationManager.branchCondition === defbranch) {
                     branchcolor = this.shadeColor(dimensionColor, .1);
                     branchcursorcolor = this.shadeColor(dimensionColor, .2);
@@ -336,7 +380,7 @@ class VariationalEditor {
                 let branchstyle: string, branchcursorstyle: string, branchhoverstyle: string;
 
                 if (parentClass) {
-                    // The background color for a line in a dimension uses the css
+                    // The background color for a line in a dimension uses the CSS
                     // function linear-gradient. Each nested dimension starts one
                     // percent higher than the parent dimension.
                     const parentStyle: string = linearGradientCache[parentClass];
@@ -348,10 +392,12 @@ class VariationalEditor {
                         parentStyle.slice(lastStyleGradientIndex).replace('%', ''),
                         10) + 1;
 
+                    // Create the styles that will be applied to the linear gradient.
                     branchstyle = `${parentStyle}, ${branchcolor} ${styleGradient}%`;
                     branchcursorstyle = `${parentStyle}, ${branchcursorcolor} ${styleGradient}%`;
                     branchhoverstyle = `${parentStyle}, ${branchhovercolor} ${styleGradient}%`;
 
+                    // Create the styles for the dimension/choice classname.
                     css += `atom-text-editor div.${decorationManager.className}.line { background: linear-gradient(90deg, ${branchstyle}) }\n`;
                     css += `atom-text-editor div.${decorationManager.className}.line.cursor-line { background: linear-gradient(90deg, ${branchcursorstyle}) }\n`;
                     css += `atom-text-editor div.${decorationManager.className}.line.hover-alt { background: linear-gradient(90deg, ${branchhoverstyle}) }\n`;
@@ -365,11 +411,13 @@ class VariationalEditor {
                     branchstyle = `${branchcolor} 0%`; // For use by child classes that require linear-gradient.
                 }
 
-                // Add branchstyle to stylesCache.
+                // Add branchstyle to the linear gradient cache for use by any
+                // child choices when creating linear gradients.
                 linearGradientCache[decorationManager.className] = branchstyle;
             }
         }
 
+        // Add the stylesheet to the editor.
         const stylePath = path.resolve(
             atom.packages.resolvePackagePath('variational-editor-atom'),
             'styles',
