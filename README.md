@@ -8,8 +8,8 @@
 
 The following are required to install the editor plugin.
 
-* npm
-* Atom
+* [npm](https://www.npmjs.com/get-npm)
+* [Atom](https://flight-manual.atom.io/getting-started/sections/installing-atom/)
 * variational-editor-backend (see https://github.com/lambda-land/variational-editor-backend)
 
 Follow the instructions in the variational-editor-backend repository to build
@@ -20,7 +20,7 @@ this package.
 **Note**
 
 To find the variational-parser executable location, run the following command
-from the root of the variational-editor-backend project (assuming you built the
+from the root of the *variational-editor-backend* project (assuming you built the
 executable using Stack).
 
 ```bash
