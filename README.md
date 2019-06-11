@@ -4,42 +4,43 @@
 
 ## Install
 
-### Requirements
+1. Get the Variation Editor Atom plugin
 
-The following are required to install the editor plugin.
+Clone it!
+
+1. Requirements
+
+Install the following software:
 
 * [npm](https://www.npmjs.com/get-npm)
 * [Atom](https://flight-manual.atom.io/getting-started/sections/installing-atom/)
-* variational-editor-backend (see https://github.com/lambda-land/variational-editor-backend)
 
-Follow the instructions in the variational-editor-backend repository to build
-the variational-parser, then install the parser under the `lib/` directory in
-this package.
+1. Build the Variational Editor Backend
+
+Follow the instructions in the variational-editor-backend repository which can
+be found [here](https://github.com/lambda-land/variational-editor-backend) to
+build the variational-parser.
+
+1. Install the Variational Editor Backend in the Variational Editor Atom plugin
+
+The parser from the backend needs to be copied under the `lib/` directory in
+this package. From the *variational-editor-backend* directory run
+``cp -v `stack exec which variational-parser` /path/to/variational-editor-atom/lib``
+where `/path/to/variational-editor-atom/lib` is the path to the `lib/`
+directory of this project.
+
+1. Linking to Atom
 
 ---
 **Note**
 
-To find the variational-parser executable location, run the following command
-from the root of the *variational-editor-backend* project (assuming you built the
-executable using Stack).
-
-```bash
-# To find the location of the variational-parser.
-stack exec which variational-parser
-# One-liner to copy it to the variational-editor-atom lib.
-cp -v `stack exec which variational-parser` /path/to/variational-editor-atom/lib/
-```
+This step will not work if npm and Atom are not installed.
 
 ---
 
-### Linking to Atom
-
-Clone the repository, copy the variational-parser executable to the lib/
-directory, install npm packages, then run the `atominstall` command
-from the project root.
+Run the `atominstall` command.
 
 ```bash
-cd variational-editor-atom
 npm install
 npm run atominstall
 ```
@@ -83,15 +84,23 @@ package state.
 Tests can be run on the command line with `npm run test` or when this project
 is open in Atom with the key binding `CTRL+SHIFT+Y`.
 
+---
+**Note**
+
+These tests may be out of date. They were put in place in Summer 2018 to make
+sure functionality did not break during major refactoring.
+
+---
+
 ## Contributing
 
 ### Adding dependencies from DefinitelyTyped
 
-DefinitelyTyped publishes type definition files for thousands of existing JS
-packages to allow compatibility with TypeScript. Most of these packages have a
-procedurally generated package.json file that does not specify versions for
-their dependencies. This results in inconsistent builds and can break the
-dependencies this package relies on.
+[DefinitelyTyped](https://definitelytyped.org/) publishes type definition files
+for thousands of existing JS packages to allow compatibility with TypeScript.
+Most of these packages have a procedurally generated package.json file that
+does not specify versions for their dependencies. This results in inconsistent
+builds and can break the dependencies this package relies on.
 
 In order to avoid this issue, *all* `@types` packages, including dependencies
 of dependencies and so on, should be specified in the package.json file for
