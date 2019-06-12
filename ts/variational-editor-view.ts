@@ -22,6 +22,7 @@ const iconsPath = path.resolve(
     "icons"
 );
 
+// Handles actions for the sidebar.
 export class VariationalEditorView {
     main: JQuery;
     private onChooseChoiceCb: (dimension: string, c: BranchCondition) => any;
@@ -41,6 +42,7 @@ export class VariationalEditorView {
 </div>`);
         this.sidePanel.append(this.secondary);
 
+        // References the individual panels for each dimension.
         this.panelMenus = {};
 
         for (let dimension in state) {
@@ -61,10 +63,13 @@ export class VariationalEditorView {
         this.sidePanel.remove();
     }
 
+    // Create a new dimension panel.
     createPanelMenu(name: string, color?: string) {
+        // TODO: Select unique default colors.
         const dimensionColor: string = color ? color : 'rgb(127, 71, 62)';
 
         if (!this.hasPanelMenu(name)) {
+            // Create a new panel menu for dimension.
             this.panelMenus[name] = {
                 name: name,
                 color: dimensionColor,
@@ -74,6 +79,7 @@ export class VariationalEditorView {
             };
             const panelMenu = this.panelMenus[name];
 
+            // Create the HTML that represents the panel.
             const idBoth: string = `${name}-view-both`;
             const idDef: string = `${name}-view-defbranch`;
             const idNDef: string = `${name}-view-ndefbranch`;
@@ -99,6 +105,8 @@ export class VariationalEditorView {
             panelMenu.element = element;
             panelMenu.colorpicker = colorPicker;
 
+            // Attach the spectrum colorpicker to the panel and the handler for
+            // when the color changes.
             panelMenu.colorpicker.spectrum({
                 color: panelMenu.color,
                 preferredFormat: 'rgb'
@@ -107,6 +115,7 @@ export class VariationalEditorView {
                 this.onColorChangeCb();
             });
 
+            // Attach handlers for when a radio button is clicked.
             panelMenu.element.find(`#${idBoth}`).on('click', () => {
                 this.onChooseChoiceCb(name, null)
             });
@@ -120,6 +129,7 @@ export class VariationalEditorView {
             this.main.append(element);
         }
         else {
+            // Make sure the panel is visible.
             const panelMenu = this.getPanelMenu(name);
             if (!panelMenu.visible) {
                 this.main.append(panelMenu.element);
@@ -179,6 +189,7 @@ export class VariationalEditorView {
         this.onChooseChoiceCb = cb;
     }
 
+    // Unmark all panel menus.
     unmark(): void {
         Object.keys(this.panelMenus).forEach(key => {
             this.panelMenus[key].visible = false;

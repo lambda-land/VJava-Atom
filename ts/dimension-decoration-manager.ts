@@ -16,6 +16,8 @@ export class DimensionDecorationManager {
     children: DimensionDecorationManager[]
     marked: boolean
 
+    // The parameters are optional because the top level Manager should not have
+    // any choice/dimension as it's the entry point to all the child dimension/choice.
     constructor(dimension?: string, branchCondition?: BranchCondition, decoration?: Decoration) {
         if (dimension !== undefined) {
             this.dimension = dimension
@@ -31,6 +33,7 @@ export class DimensionDecorationManager {
         this.marked = true;
     }
 
+    // The classname of the underlying decoration.
     get className(): string {
         if (this.decoration) {
             return this.decoration.getProperties().class;
@@ -38,6 +41,7 @@ export class DimensionDecorationManager {
         return null;
     }
 
+    // The range of the underlying decoration.
     get range(): Range {
         if (this.decoration) {
             return this.decoration.getMarker().getBufferRange();
@@ -50,10 +54,12 @@ export class DimensionDecorationManager {
     // The class name for top level Decorations is
     // `dimension-marker-<dimensionName>-<branchCondition>` and all child
     // Decorations have class names formatted
-    // `<parentClassName>-<dimensionName>-<branchCondition`.
+    // `<parentClassName>-<dimensionName>-<branchCondition>`.
     addDecoration(marker: DisplayMarker, dimension: string, branchCondition: BranchCondition): void {
         let classPrefix: string;
         if (this.decoration) {
+            // This manager is not the top level manager, so use it's classname
+            // as the prefix for the new child manager.
             classPrefix = this.decoration.getProperties()['class'];
         }
         else {
@@ -70,14 +76,19 @@ export class DimensionDecorationManager {
             return;
         }
 
+        // Compare the range of the marker to the children managers and designate
+        // it as a sybling or a child's child.
         for (let i = 0; i < this.children.length; i++) {
             const node = this.children[i];
             const comparison: string = this.compareDecorations(marker, node.decoration.getMarker());
 
             if (comparison === 'child') {
+                // This marker is a child's child, so add it to that child.
                 return node.addDecoration(marker, dimension, branchCondition);
             }
             else if (comparison === 'above') {
+                // The range of this marker is less than this child's range,
+                // so place it before this child.
                 decoration = this.createDecoration(marker, className);
                 // Append the decoration to the end of children and swap left
                 // until it is in the place of children[i].
@@ -157,6 +168,7 @@ export class DimensionDecorationManager {
         }
     }
 
+    // Return this if it has a decoration otherwise return it's children.
     getDecorations(): DimensionDecorationManager[] {
         if (this.decoration) {
             return [this];
@@ -164,6 +176,7 @@ export class DimensionDecorationManager {
         return this.children;
     }
 
+    // Return all managers for a specific dimension.
     filterDimension(dimension: string): DimensionDecorationManager[] {
         const decorations: DimensionDecorationManager[] = [];
 
@@ -178,6 +191,7 @@ export class DimensionDecorationManager {
         return decorations;
     }
 
+    // Return all managers for a specific dimension and choice.
     filterDimensionChoice(dimension: string, choice: BranchCondition): DimensionDecorationManager[] {
         const decorations: DimensionDecorationManager[] = [];
 

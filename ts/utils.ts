@@ -7,6 +7,7 @@ interface QueueNode<T> {
     next?: QueueNode<T>;
 }
 
+// Generic Queue.
 export class Queue<T> {
     private startNode: QueueNode<T>;
     private endNode: QueueNode<T>;
@@ -65,39 +66,5 @@ export class Queue<T> {
 
             this._size++;
         }
-    }
-}
-
-export class Stack<T> {
-    private stack: T[];
-
-    constructor() {
-        this.stack = [];
-    }
-
-    get size(): number {
-        return this.stack.length;
-    }
-
-    empty(): boolean {
-        return this.size === 0;
-    }
-
-    peek(): T {
-        if (!this.size) {
-            throw new Error('peek: cannot peek in empty stack');
-        }
-        return this.stack[this.size - 1];
-    }
-
-    pop(): T {
-        if (!this.size) {
-            throw new Error('pop: cannot pop from empty stack');
-        }
-        return this.stack.pop();
-    }
-
-    push(...items: T[]): void {
-        this.stack.push(...items);
     }
 }
