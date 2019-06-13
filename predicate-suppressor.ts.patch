@@ -1,0 +1,118 @@
+diff --git a/ts/predicate-suppressor.ts b/ts/predicate-suppressor.ts
+index 3dc854c..ef178a8 100644
+--- a/ts/predicate-suppressor.ts
++++ b/ts/predicate-suppressor.ts
+@@ -5,7 +5,6 @@ import {
+     Decoration,
+     DisplayLayer,
+     Disposable,
+-    Marker,
+     Point,
+     Range
+ } from 'atom';
+@@ -25,7 +24,6 @@ declare module 'atom' {
+     }
+ }
+ 
+-type Direction = 'up' | 'down';
+ type emitFoldSig = (nextHunk: any, decorationIterator: any, endBufferRow: any) => void;
+ type emitOpenTagSig = (number, boolean) => void;
+ type FoldId = number
+@@ -59,6 +57,29 @@ class Predicate {
+         }
+     }
+ 
++    addClass(classname: string) {
++        let properties = this.decoration.getProperties();
++        if (properties.class && properties.class.indexOf(classname) === -1) {
++            properties.class += ` {classname}`;
++        }
++        else {
++            properties.class = classname;
++        }
++        this.decoration.setProperties(properties);
++    }
++
++    removeClass(classname: string) {
++        let properties = this.decoration.getProperties();
++        if (properties.class === classname) {
++            delete properties['class'];
++        }
++        else if (properties.class) {
++            properties.class = properties.class.replace(classname, '');
++        }
++
++        this.decoration.setProperties(properties);
++    }
++
+     createFoldRange(): Range {
+         return new Range([this.range.start.row - 1, Infinity], this.range.end);
+     }
+@@ -135,7 +156,7 @@ export class PredicateSuppressor {
+         this.skipCursorCB = false;
+ 
+         // This stylesheet will make the folds created by LineSuppressor invisible.
+-        this.stylesheet = atom.styles.addStyleSheet('.line .fold-marker.suppress-line { visibility: hidden };')
++        this.stylesheet = atom.styles.addStyleSheet('.line .fold-marker.suppress-line { visibility: hidden; }\natom-text-editor div.hide-background.line { background-color: inherit !important; }\n');
+     }
+ 
+     destroy() {
+@@ -160,6 +181,9 @@ export class PredicateSuppressor {
+             const predicate = new Predicate(bufferRow);
+             predicate.hide();
+             this.predicates.push(predicate);
++            // Update the class names for each decoration since a new one was
++            // added.
++            this.updateClassNames();
+         }
+     }
+ 
+@@ -229,6 +253,7 @@ export class PredicateSuppressor {
+         }
+     }
+ 
++    // Return all hidden predicates in range.
+     findHiddenPredicateForRange(range: Range): Predicate {
+         for (let predicate of this.predicates) {
+             if (predicate.hidden && predicate.hiddenRange.isEqual(range)) {
+@@ -238,10 +263,12 @@ export class PredicateSuppressor {
+         return null;
+     }
+ 
++    // Return the predicate at bufferRow.
+     findPredicateForRow(bufferRow: number): Predicate {
+         return this.findPredicateForPoint(new Point(bufferRow, 0));
+     }
+ 
++    // Return the predicate at point.
+     findPredicateForPoint(point: Point): Predicate {
+         for (let predicate of this.predicates) {
+             if (predicate.range.containsPoint(point)) {
+@@ -251,6 +278,7 @@ export class PredicateSuppressor {
+         return null;
+     }
+ 
++    // Return all predicates in range.
+     findPredicateForRange(range: Range): Predicate {
+         for (let predicate of this.predicates) {
+             if (predicate.range.isEqual(range)) {
+@@ -259,4 +287,19 @@ export class PredicateSuppressor {
+         }
+         return null;
+     }
++
++    // Update the class names of each decoration. If a predicate is on a line
++    // directly below another predicate, add the class name that sets the
++    // background-color to inherit.
++    updateClassNames() {
++        const className = 'inherit-background'
++        for (let predicate of this.predicates) {
++            if (this.findPredicateForRow(predicate.range.start.row) !== null) {
++                predicate.addClass(className);
++            }
++            else {
++                predicate.removeClass(className);
++            }
++        }
++    }
+ }

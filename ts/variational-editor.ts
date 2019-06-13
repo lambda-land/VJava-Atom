@@ -21,6 +21,8 @@ import {
     defbranch,
     ndefbranch
 } from './dimension-decoration-manager';
+
+import { PredicateSuppressor } from './predicate-suppressor';
 import { VariationalEditorView } from './variational-editor-view';
 import { Queue } from './utils';
 
@@ -28,6 +30,7 @@ import { Queue } from './utils';
 declare module 'atom' {
     interface DisplayLayer {
         destroyFold: (id: number) => void;
+        foldsMarkerLayer: MarkerLayer;
     }
 
     // These methods are not documented in Atom's public API.
@@ -41,6 +44,8 @@ declare module 'atom' {
         displayLayer: DisplayLayer;
         // This method can be found in `src/text-editor.js` in Atom's GitHub.
         foldBufferRange(range: Range): number;
+        // This method can be found in `src/text-editor.js` in Atom's Github.
+        foldBufferRowRange(startRow: number, endRow: number): number;
         // This method can be found in `src/text-editor.js` in Atom's GitHub.
         destroyFoldsIntersectingBufferRange(range: Range): Range[]
     }
@@ -57,6 +62,7 @@ class VariationalEditor {
     };
     private decorations: DimensionDecorationManager;
     private onDidStopChangeCB: Disposable;
+    private hiddenPredicates: PredicateSuppressor;
     private parsed: boolean;
     private sidePanel: Panel;
     private stylesheet: Disposable;
@@ -91,9 +97,19 @@ class VariationalEditor {
 
     // This method is called before Atom exits.
     deactivate() {
+        const editor = atom.workspace.getActiveTextEditor();
+        Object.keys(this.choiceFolds).forEach((key) => {
+            const choice = this.choiceFolds[key];
+            for (let foldId of choice.foldIds) {
+                editor.displayLayer.destroyFold(foldId);
+            }
+        });
         this.decorations.destroy();
-        this.sidePanel.destroy();
+        this.hiddenPredicates.destroy();
+        this.onDidStopChangeCB.dispose();
+        this.stylesheet.dispose();
         this.subscriptions.dispose();
+        this.sidePanel.destroy();
         this.ui.destroy();
     }
 
@@ -132,6 +148,7 @@ class VariationalEditor {
 
             this.choiceFolds = {};
             this.decorations = new DimensionDecorationManager();
+            this.hiddenPredicates = new PredicateSuppressor();
 
             // Parse the file to update the UI for the current state of the
             // buffer.
@@ -287,15 +304,20 @@ class VariationalEditor {
         }
 
         const foldRanges: Range[] = [];
+        // The range of dimension choices starts at column 0 of the dimensions
+        // preprocessor directive. Since this directive is folded by the
+        // PredicateSuppressor, the fold for the dimension range should start
+        // one line below the preprocessor directive.
         // The range of dimension choices ends at column 0 of the row the next
         // preprocessor directive begins (ex. for "#ifdef", the range ends before
         // the "#" in "#else"). This range results in the next preprocessor
         // directive starting on the same line as the fold. We want it to start
         // on the line after the fold, so adjust the range accordingly.
         for (let choice of foldChoices) {
+            const newStartRow: number = choice.range.start.row + 1;
             const newEndRow: number = choice.range.end.row - 1;
             const range: Range = new Range(
-                choice.range.start,
+                [newStartRow, 0],
                 [newEndRow, Infinity]);
             foldRanges.push(range)
         }
