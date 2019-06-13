@@ -95,7 +95,6 @@ const HIDDENFOLD = (1 << -1) | (1 << 7); // Bitwise OR the FOLD flag (1 << 7) wi
 export class PredicateSuppressor {
     private displayLayer: DisplayLayer;
     private cursorCBDisposable: Disposable;
-    private skipCursorCB: boolean;
     private predicates: Predicate[];
     private _emitFold: emitFoldSig; // This is to store the original emitFold method.
     private emitFold: emitFoldSig;  // This will have the original ScreenLineBuilder object bound to it.
@@ -132,7 +131,6 @@ export class PredicateSuppressor {
         this.cursorCBDisposable = editor.onDidChangeCursorPosition((e) => {
             this.displayLine(e);
         });
-        this.skipCursorCB = false;
 
         // This stylesheet will make the folds created by LineSuppressor invisible.
         this.stylesheet = atom.styles.addStyleSheet('.line .fold-marker.suppress-line { visibility: hidden };')
@@ -192,15 +190,10 @@ export class PredicateSuppressor {
         const cursorPos = e.newBufferPosition;
         const oldCursorPos = e.oldBufferPosition;
 
-        if (this.skipCursorCB) {
-            this.skipCursorCB = !this.skipCursorCB;
-            return;
-        }
-
         // Hide predicate if no longer on line.
         if (oldCursorPos.row !== cursorPos.row) {
-            const predicate = this.findPredicateForPoint(oldCursorPos);
-            if (predicate !== null) {
+            const predicate = this.findPredicateForRow(oldCursorPos.row);
+            if (predicate) {
                 predicate.hide();
             }
         }
@@ -218,11 +211,8 @@ export class PredicateSuppressor {
             predicate = this.findPredicateForRow(oldCursorPos.row - 1);
         }
 
-        if (predicate !== null) {
+        if (predicate && predicate.hidden) {
             predicate.show();
-            // Skip running the callback when the cursor position is manually
-            // set by setBufferPosition.
-            this.skipCursorCB = true
             // Set the position of the cursor to the same row as the predicate
             // while keeping the column constant.
             e.cursor.setBufferPosition([predicate.range.start.row, cursorPos.column]);
@@ -244,7 +234,7 @@ export class PredicateSuppressor {
 
     findPredicateForPoint(point: Point): Predicate {
         for (let predicate of this.predicates) {
-            if (predicate.range.containsPoint(point)) {
+            if (predicate.range.containsPoint(point, false)) {
                 return predicate;
             }
         }
