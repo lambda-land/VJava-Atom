@@ -260,6 +260,9 @@ class VariationalEditor {
     // Recursively add dimensions/choices to the UI.
     addDimensions(node: SegmentNode | RegionNode) {
         if (node.type === 'choice') {
+            this.hiddenPredicates.add(node.thenbranch.span['start'][0]);
+            this.hiddenPredicates.add(node.thenbranch.span['end'][0]);
+            this.hiddenPredicates.add(node.elsebranch.span['end'][0]);
             this.ui.createPanelMenu(node.name);
             this.addDecoration(node);
             this.addDimensions(node.thenbranch);
