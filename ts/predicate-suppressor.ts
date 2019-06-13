@@ -82,6 +82,44 @@ class Predicate {
             this.foldId = null;
         }
     }
+
+    atRow(row: number): boolean {
+        return this.range.start.row === row;
+    }
+}
+
+class Predicates {
+    private predicates: Predicate[];
+
+    constructor(bufferRows: number[]) {
+        this.predicates = [];
+        for (let bufferRow of bufferRows) {
+            this.predicates.push(new Predicate(bufferRow));
+        }
+    }
+
+    destroy() {
+        this.predicates.forEach(x => x.destroy());
+    }
+
+    hasRows(bufferRows: number[]) {
+        if (bufferRows.length !== this.predicates.length) {
+            return false;
+        }
+
+        for (let bufferRow of bufferRows) {
+            let hasRow = this.predicates.filter(x => { return x.atRow(bufferRow) });
+            if (!hasRow) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    hide() {
+        this.predicates.forEach(x => x.hide());
+    }
 }
 
 // This flag is used as a modified FOLD flag.
@@ -95,7 +133,7 @@ const HIDDENFOLD = (1 << -1) | (1 << 7); // Bitwise OR the FOLD flag (1 << 7) wi
 export class PredicateSuppressor {
     private displayLayer: DisplayLayer;
     private cursorCBDisposable: Disposable;
-    private predicates: Predicate[];
+    private predicates: Predicates[];
     private _emitFold: emitFoldSig; // This is to store the original emitFold method.
     private emitFold: emitFoldSig;  // This will have the original ScreenLineBuilder object bound to it.
     private _emitOpenTag: emitOpenTagSig // This is to store the original emitOpenTag method.
@@ -151,11 +189,11 @@ export class PredicateSuppressor {
     }
 
     // Add the buffer row to the lines that should be suppressed.
-    add(bufferRow: number) {
-        let fold = this.findPredicateForRow(bufferRow);
+    add(bufferRows: number[]) {
+        let fold = this.findPredicateForRows(bufferRows);
 
         if (fold === null) {
-            const predicate = new Predicate(bufferRow);
+            const predicate = new Predicates(bufferRows);
             predicate.hide();
             this.predicates.push(predicate);
         }
@@ -203,7 +241,7 @@ export class PredicateSuppressor {
         // unfolded line. To counteract this, the folded predicate closest
         // to the old cursor position is made visible and the cursor is moved
         // to that line.
-        let predicate: Predicate = null;
+        let predicate: Predicates = null;
         if (cursorPos.row > oldCursorPos.row) {
             predicate = this.findPredicateForRow(oldCursorPos.row + 1);
         }
@@ -219,7 +257,7 @@ export class PredicateSuppressor {
         }
     }
 
-    findHiddenPredicateForRange(range: Range): Predicate {
+    findHiddenPredicateForRange(range: Range): Predicates {
         for (let predicate of this.predicates) {
             if (predicate.hidden && predicate.hiddenRange.isEqual(range)) {
                 return predicate;
@@ -228,20 +266,25 @@ export class PredicateSuppressor {
         return null;
     }
 
-    findPredicateForRow(bufferRow: number): Predicate {
-        return this.findPredicateForPoint(new Point(bufferRow, 0));
-    }
-
-    findPredicateForPoint(point: Point): Predicate {
+    findPredicateForRow(bufferRow: number) {
         for (let predicate of this.predicates) {
-            if (predicate.range.containsPoint(point, false)) {
+            if (predicate.hasRow(bufferRow)) {
                 return predicate;
             }
         }
         return null;
     }
 
-    findPredicateForRange(range: Range): Predicate {
+    findPredicateForRows(bufferRows: number[]): Predicates {
+        for (let predicate of this.predicates) {
+            if (predicate.hasRows(bufferRows)) {
+                return predicate
+            }
+        }
+        return null;
+    }
+
+    findPredicateForRange(range: Range): Predicates {
         for (let predicate of this.predicates) {
             if (predicate.range.isEqual(range)) {
                 return predicate;
