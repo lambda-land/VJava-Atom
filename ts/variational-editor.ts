@@ -85,10 +85,20 @@ class VariationalEditor {
         }));
     }
 
+    // Cleanup.
     deactivate() {
+        const editor = atom.workspace.getActiveTextEditor();
+        Object.keys(this.choiceFolds).forEach((key) => {
+            const choice = this.choiceFolds[key];
+            for (let foldId of choice.foldIds) {
+                editor.displayLayer.destroyFold(foldId);
+            }
+        });
         this.decorations.destroy();
-        this.sidePanel.destroy();
+        this.hiddenPredicates.destroy();
+        this.stylesheet.dispose();
         this.subscriptions.dispose();
+        this.sidePanel.destroy();
         this.ui.destroy();
     }
 
