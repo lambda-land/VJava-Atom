@@ -134,6 +134,7 @@ class VariationalEditor {
 
             this.onDidStopChangeCB.dispose();
             this.decorations.destroy();
+            this.hiddenPredicates.destroy();
             this.stylesheet.dispose();
             // Hide the side panel, but don't destroy it. Then it does not need
             // to be recreated every time the UI is toggled on.
