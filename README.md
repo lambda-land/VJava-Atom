@@ -8,20 +8,20 @@
 
 Clone it!
 
-1. Requirements
+2. Requirements
 
 Install the following software:
 
 * [npm](https://www.npmjs.com/get-npm)
 * [Atom](https://flight-manual.atom.io/getting-started/sections/installing-atom/)
 
-1. Build the Variational Editor Backend
+3. Build the Variational Editor Backend
 
 Follow the instructions in the variational-editor-backend repository which can
 be found [here](https://github.com/lambda-land/variational-editor-backend) to
 build the variational-parser.
 
-1. Install the Variational Editor Backend in the Variational Editor Atom plugin
+4. Install the Variational Editor Backend in the Variational Editor Atom plugin
 
 The parser from the backend needs to be copied under the `lib/` directory in
 this package. From the *variational-editor-backend* directory run
@@ -29,7 +29,7 @@ this package. From the *variational-editor-backend* directory run
 where `/path/to/variational-editor-atom/lib` is the path to the `lib/`
 directory of this project.
 
-1. Linking to Atom
+5. Linking to Atom
 
 ---
 **Note**

@@ -94,22 +94,32 @@ class Predicates {
     constructor(bufferRows: number[]) {
         this.predicates = [];
         for (let bufferRow of bufferRows) {
-            this.predicates.push(new Predicate(bufferRow));
+            if (!this.hasRow(bufferRow)) {
+                this.predicates.push(new Predicate(bufferRow));
+            }
         }
+    }
+
+    get hidden(): boolean {
+        return this.predicates.filter(x => x.hidden).length === this.predicates.length;
     }
 
     destroy() {
         this.predicates.forEach(x => x.destroy());
     }
 
-    hasRows(bufferRows: number[]) {
+    hasRow(bufferRow: number): boolean {
+        return this.predicates.filter(x => x.atRow(bufferRow)).length > 0;
+    }
+
+    hasRows(bufferRows: number[]): boolean {
         if (bufferRows.length !== this.predicates.length) {
             return false;
         }
 
         for (let bufferRow of bufferRows) {
             let hasRow = this.predicates.filter(x => { return x.atRow(bufferRow) });
-            if (!hasRow) {
+            if (hasRow.length === 0) {
                 return false;
             }
         }
@@ -117,8 +127,21 @@ class Predicates {
         return true;
     }
 
+    show() {
+        this.predicates.forEach(x => x.show());
+    }
+
     hide() {
         this.predicates.forEach(x => x.hide());
+    }
+
+    findPredicateForRow(bufferRow: number): Predicate {
+        for (let predicate of this.predicates) {
+            if (predicate.atRow(bufferRow)) {
+                return predicate;
+            }
+        }
+        return null;
     }
 }
 
@@ -133,6 +156,7 @@ const HIDDENFOLD = (1 << -1) | (1 << 7); // Bitwise OR the FOLD flag (1 << 7) wi
 export class PredicateSuppressor {
     private displayLayer: DisplayLayer;
     private cursorCBDisposable: Disposable;
+    private expectedPosition: Point;
     private predicates: Predicates[];
     private _emitFold: emitFoldSig; // This is to store the original emitFold method.
     private emitFold: emitFoldSig;  // This will have the original ScreenLineBuilder object bound to it.
@@ -169,6 +193,7 @@ export class PredicateSuppressor {
         this.cursorCBDisposable = editor.onDidChangeCursorPosition((e) => {
             this.displayLine(e);
         });
+        this.expectedPosition = null;
 
         // This stylesheet will make the folds created by LineSuppressor invisible.
         this.stylesheet = atom.styles.addStyleSheet('.line .fold-marker.suppress-line { visibility: hidden };')
@@ -189,7 +214,7 @@ export class PredicateSuppressor {
     }
 
     // Add the buffer row to the lines that should be suppressed.
-    add(bufferRows: number[]) {
+    add(...bufferRows: number[]) {
         let fold = this.findPredicateForRows(bufferRows);
 
         if (fold === null) {
@@ -201,8 +226,8 @@ export class PredicateSuppressor {
 
     emitHiddenFold(nextHunk: any, decorationIterator: any, endBufferRow: any) {
         const editor = atom.workspace.getActiveTextEditor();
-        const predicate = this.findHiddenPredicateForRange(new Range(nextHunk.oldStart, nextHunk.oldEnd));
-        if (predicate !== null) {
+        const predicates = this.findHiddenPredicateForRange(new Range(nextHunk.oldStart, nextHunk.oldEnd));
+        if (predicates !== null) {
             // Override emitOpenTag to use the HIDDENFOLD flag instead of the default
             // FOLD flag.
             editor.displayLayer.screenLineBuilder.emitOpenTag = (scopeId: number, reopenTags: boolean = true) => {
@@ -228,48 +253,53 @@ export class PredicateSuppressor {
         const cursorPos = e.newBufferPosition;
         const oldCursorPos = e.oldBufferPosition;
 
-        // Hide predicate if no longer on line.
+        if (this.expectedPosition && this.expectedPosition.isEqual(cursorPos)) {
+            this.expectedPosition = null;
+            return;
+        }
+
         if (oldCursorPos.row !== cursorPos.row) {
-            const predicate = this.findPredicateForRow(oldCursorPos.row);
-            if (predicate) {
-                predicate.hide();
+            // Hide predicate if no longer on line.
+            let predicates = this.findPredicatesForRow(oldCursorPos.row);
+            if (predicates) {
+                predicates.hide();
             }
         }
-
-        // Show predicate if cursor "moved" to same line as predicate.
-        // Since the predicates are folded, the cursor moves to the next
-        // unfolded line. To counteract this, the folded predicate closest
-        // to the old cursor position is made visible and the cursor is moved
-        // to that line.
-        let predicate: Predicates = null;
-        if (cursorPos.row > oldCursorPos.row) {
-            predicate = this.findPredicateForRow(oldCursorPos.row + 1);
-        }
-        else if (cursorPos.row < oldCursorPos.row) {
-            predicate = this.findPredicateForRow(oldCursorPos.row - 1);
+        else {
+            // Do nothing if same row.
+            this.expectedPosition = null;
+            return;
         }
 
-        if (predicate && predicate.hidden) {
-            predicate.show();
-            // Set the position of the cursor to the same row as the predicate
-            // while keeping the column constant.
-            e.cursor.setBufferPosition([predicate.range.start.row, cursorPos.column]);
+        // Adjust the cursor position if it jumped over a predicate.
+        this.expectedPosition = this.adjustedCursorPosition(e);
+        if (!this.expectedPosition.isEqual(cursorPos)) {
+            // Show predicate if cursor "moved" to same line as predicate.
+            // Since the predicates are folded, the cursor moves to the next
+            // unfolded line.
+            this.hide();
+            this.show();
+            e.cursor.setBufferPosition(this.expectedPosition);
+        }
+        else {
+            // Do nothing if the expected position is the same as the current position.
+            this.expectedPosition = null;
         }
     }
 
     findHiddenPredicateForRange(range: Range): Predicates {
-        for (let predicate of this.predicates) {
-            if (predicate.hidden && predicate.hiddenRange.isEqual(range)) {
-                return predicate;
+        for (let predicates of this.predicates) {
+            if (predicates.hidden && predicates.findPredicateForRow(range.end.row)) {
+                return predicates;
             }
         }
         return null;
     }
 
-    findPredicateForRow(bufferRow: number) {
-        for (let predicate of this.predicates) {
-            if (predicate.hasRow(bufferRow)) {
-                return predicate;
+    findPredicatesForRow(bufferRow: number) {
+        for (let predicates of this.predicates) {
+            if (predicates.hasRow(bufferRow)) {
+                return predicates;
             }
         }
         return null;
@@ -284,12 +314,51 @@ export class PredicateSuppressor {
         return null;
     }
 
-    findPredicateForRange(range: Range): Predicates {
-        for (let predicate of this.predicates) {
-            if (predicate.range.isEqual(range)) {
-                return predicate;
-            }
+    adjustedCursorPosition(e: CursorPositionChangedEvent): Point {
+        const cursorPos = e.newBufferPosition;
+        const oldCursorPos = e.oldBufferPosition;
+
+        let direction = 0;
+        if (cursorPos.row > oldCursorPos.row) {
+            direction = 1;
         }
-        return null;
+        else if (cursorPos.row < oldCursorPos.row) {
+            direction = -1;
+        }
+        const row = oldCursorPos.row + direction;
+        const predicates = this.findPredicatesForRow(row);
+
+        if (predicates) {
+            // Set the new position to the same row as the predicate
+            // while adjusting the column to a new length if the predicate line
+            // is shorter then the current column.
+            const predicate = predicates.findPredicateForRow(row);
+            const column = cursorPos.column > predicate.range.end.column ? predicate.range.end.column : cursorPos.column;
+            return new Point(row, column);
+        }
+
+        return cursorPos;
+    }
+
+    // Hide all predicates except any that are at the cursors expected position.
+    hide() {
+        if (this.expectedPosition) {
+            this.predicates.forEach(x => {
+                if (!x.hasRow(this.expectedPosition.row)) {
+                    x.hide();
+                }
+            });
+        }
+    }
+
+    // Show any predicate that is at the cursors expected position.
+    show() {
+        if (this.expectedPosition) {
+            this.predicates.forEach(x => {
+                if (x.hasRow(this.expectedPosition.row)) {
+                    x.show();
+                }
+            });
+        }
     }
 }
